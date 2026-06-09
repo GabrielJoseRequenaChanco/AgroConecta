@@ -1,5 +1,5 @@
 streamlit
-supabase
+subabase
 python-dotenv
 pandas
 numpy
