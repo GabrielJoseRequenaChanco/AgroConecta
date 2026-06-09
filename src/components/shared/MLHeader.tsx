@@ -5,8 +5,10 @@ import { useState } from "react";
 
 export function MLHeader() {
   const usuario = useAppStore((s) => s.usuarioActivo);
+  const authSignOut = useAppStore((s) => s.authSignOut);
   const router = useRouter();
   const [q, setQ] = useState("");
+  const destino = usuario.ubicacion?.trim() || "Huancayo, Junín";
 
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,40 +63,70 @@ export function MLHeader() {
           <div className="flex items-center gap-1 shrink-0">
             <MapPin className="w-3.5 h-3.5" />
             <span className="opacity-90">Enviar a</span>
-            <span className="font-semibold">Huancayo, Junín</span>
+            <span className="font-semibold">{destino}</span>
           </div>
           <nav className="flex items-center gap-3 sm:gap-4 shrink-0">
-            <Link to="/productos" className="hover:underline">
-              Lista de rubros
+            <Link to="/categorias" className="hover:underline">
+              Categorías
             </Link>
-            <Link to="/productos" className="hover:underline hidden sm:inline">
-              Cosechas del día
-            </Link>
-            <Link to="/productos" className="hover:underline hidden md:inline">
-              Productores verificados
-            </Link>
-            <Link to="/productos" className="hover:underline hidden md:inline">
-              Precios justos
+            <Link to="/ofertas" className="hover:underline hidden sm:inline">
+              Ofertas
             </Link>
           </nav>
           <div className="ml-auto flex items-center gap-3 sm:gap-4 shrink-0">
-            <Link to="/registro" className="hover:underline hidden sm:inline">
-              Crea tu cuenta
-            </Link>
-            <Link
-              to={
-                usuario.rol === "agricultor"
-                  ? "/dashboard/agricultor"
-                  : usuario.rol === "transportista"
-                    ? "/dashboard/transportista"
-                    : "/dashboard/comprador"
-              }
-              className="hover:underline font-medium"
-            >
-              {usuario.nombre.split(" ")[0]}
-            </Link>
-            <ShoppingBag className="w-4 h-4" />
-            <Bell className="w-4 h-4" />
+            {usuario.rol === "anon" ? (
+              <>
+                <Link to="/registro" className="hover:underline hidden sm:inline">
+                  Crea tu cuenta
+                </Link>
+                <Link to="/login" className="hover:underline font-medium">
+                  Ingresar
+                </Link>
+              </>
+            ) : (
+              <>
+                {/* logged-in: no create account link */}
+                <Link
+                  to={
+                    usuario.rol === "agricultor"
+                      ? "/dashboard/agricultor"
+                      : usuario.rol === "transportista"
+                      ? "/dashboard/transportista"
+                      : "/dashboard/comprador"
+                  }
+                  className="hover:underline font-medium"
+                >
+                  {usuario.nombre.split(" ")[0] || "Perfil"}
+                </Link>
+
+                {/* Role specific quick action */}
+                {usuario.rol === "agricultor" && (
+                  <Link to="/agregar-producto" className="hover:underline hidden md:inline">
+                    Vender
+                  </Link>
+                )}
+                {usuario.rol === "admin" && (
+                  <Link to="/admin" className="hover:underline hidden md:inline">Admin</Link>
+                )}
+                {usuario.rol === "transportista" && (
+                  <Link to="/fletes" className="hover:underline hidden md:inline">
+                    Buscar flete
+                  </Link>
+                )}
+                {usuario.rol === "comprador" && (
+                  <Link to="/perfil" className="hover:underline hidden md:inline">
+                    Perfil
+                  </Link>
+                )}
+
+                <Link to="/carrito" className="relative">
+                  <ShoppingBag className="w-4 h-4" />
+                  <span className="sr-only">Carrito</span>
+                </Link>
+                <Bell className="w-4 h-4" />
+                <button onClick={async () => { await authSignOut(); router.navigate({ to: "/" as any }); }} className="text-sm hover:underline hidden sm:inline">Salir</button>
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -12,21 +12,23 @@ import {
 import appCss from "../styles.css?url";
 import { MLHeader } from "@/components/shared/MLHeader";
 import { MLFooter } from "@/components/shared/MLFooter";
-import { RoleSwitcher } from "@/components/shared/RoleSwitcher";
+import logo from "@/assets/logo.png";
 
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Página no encontrada</h2>
+        <p className="text-7xl font-bold text-foreground">404</p>
+        <h1 className="mt-4 text-xl font-semibold text-foreground">
+          Página no encontrada
+        </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           La cosecha que buscas no existe o ya fue vendida.
         </p>
         <div className="mt-6">
           <Link
             to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
           >
             Volver al inicio
           </Link>
@@ -54,7 +56,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
               router.invalidate();
               reset();
             }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
           >
             Reintentar
           </button>
@@ -75,26 +77,27 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "Compra papas nativas, maíz y hortalizas directamente del agricultor en Aco, Concepción y Huancayo. Sin intermediarios, con transporte certificado.",
       },
-      { property: "og:title", content: "AgroConecta - Cosechas de Junín directo del productor" },
+      {
+        property: "og:title",
+        content: "AgroConecta - Cosechas de Junín directo del productor",
+      },
       {
         property: "og:description",
         content: "Productores verificados, precios justos, fletes seguros en Junín.",
       },
       { property: "og:type", content: "website" },
-      { name: "twitter:title", content: "AgroConecta - Cosechas de Junín directo del productor" },
-      { name: "description", content: "Agro Conecta Marketplace connects Peruvian farmers, buyers, and transporters." },
-      { property: "og:description", content: "Agro Conecta Marketplace connects Peruvian farmers, buyers, and transporters." },
-      { name: "twitter:description", content: "Agro Conecta Marketplace connects Peruvian farmers, buyers, and transporters." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/687b0bcc-a874-4dfb-aa60-8f12f6c2cf10/id-preview-7a834ac1--d668ad32-6b88-4c43-9251-6ed51a369c59.lovable.app-1779817519996.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/687b0bcc-a874-4dfb-aa60-8f12f6c2cf10/id-preview-7a834ac1--d668ad32-6b88-4c43-9251-6ed51a369c59.lovable.app-1779817519996.png" },
-      { name: "twitter:card", content: "summary_large_image" },
+      {
+        name: "twitter:title",
+        content: "AgroConecta - Cosechas de Junín directo del productor",
+      },
+      {
+        name: "twitter:card",
+        content: "summary_large_image",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      {
-        rel: "preconnect",
-        href: "https://fonts.googleapis.com",
-      },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
       {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
@@ -130,12 +133,16 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen flex flex-col bg-background">
         {minimal ? (
-          <header className="bg-primary text-primary-foreground py-3 px-4 text-center">
-            <Link to="/" className="inline-flex items-center gap-2 font-bold">
-              <span className="bg-white text-primary rounded w-7 h-7 inline-flex items-center justify-center">
-                A
+          <header className="bg-white border-b border-border py-3 px-4 text-center shadow-sm">
+            <Link to="/" className="inline-flex items-center gap-2">
+              <img
+                src={logo}
+                alt="AgroConecta"
+                className="h-8 w-auto"
+              />
+              <span className="text-xs text-muted-foreground font-medium border-l border-border pl-3">
+                Pasarela segura
               </span>
-              AgroConecta · Pasarela segura
             </Link>
           </header>
         ) : (
@@ -145,7 +152,6 @@ function RootComponent() {
           <Outlet />
         </main>
         {!minimal && <MLFooter />}
-        <RoleSwitcher />
       </div>
     </QueryClientProvider>
   );
