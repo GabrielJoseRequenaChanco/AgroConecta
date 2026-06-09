@@ -1,9 +1,6 @@
-streamlit==1.28.1
-supabase==2.4.4
-python-dotenv==1.0.0
-pandas==2.1.3
-requests==2.31.0
-gotrue==2.4.3
-postgrest-py==0.16.8
-realtime-py==1.0.0
-storage-py==0.7.2
+streamlit
+supabase
+python-dotenv
+pandas
+numpy
+requests
