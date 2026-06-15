@@ -65,8 +65,8 @@ function Checkout() {
   const flete = calcularFlete(dest, kg);
   const total = subtotal + flete;
 
-    const confirmar = async () => {
-      const ordenId = await createOrden(
+  const confirmar = async () => {
+    const ordenId = await createOrden(
       {
         productoId: producto.id,
         tituloProducto: producto.titulo,
@@ -74,14 +74,14 @@ function Checkout() {
         cantidadComprada: kg,
         totalPagoProducto: subtotal,
         totalPagoFlete: flete,
-          distritoOrigen: producto.distritoOrigen,
+        distritoOrigen: producto.distritoOrigen,
         distritoDestino: dest,
         agricultorId: producto.agricultorId,
         nombreAgricultor: producto.nombreAgricultor,
         telefonoAgricultor: producto.telefonoAgricultor,
       },
       {
-        origen: `Chacra sector ${producto.distritoOrigen}`,
+        origen: `Zona de producci\u00f3n del distrito de ${producto.distritoOrigen}`,
         destino: dest,
         tarifa: flete,
         descripcion: `${kg} kg de ${producto.titulo}`,
@@ -144,29 +144,26 @@ function Checkout() {
           <div key={s.n} className="flex items-center gap-2">
             <div className="flex items-center gap-2">
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
-                  paso > s.n
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${paso > s.n
                     ? "bg-success text-success-foreground"
                     : paso === s.n
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                }`}
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}
               >
                 {paso > s.n ? <CheckCircle2 className="w-4 h-4" /> : s.n}
               </div>
               <span
-                className={`text-sm font-medium ${
-                  paso === s.n ? "text-foreground" : "text-muted-foreground"
-                }`}
+                className={`text-sm font-medium ${paso === s.n ? "text-foreground" : "text-muted-foreground"
+                  }`}
               >
                 {s.label}
               </span>
             </div>
             {i < STEPS.length - 1 && (
               <div
-                className={`w-10 h-px transition-colors ${
-                  paso > s.n ? "bg-success" : "bg-border"
-                }`}
+                className={`w-10 h-px transition-colors ${paso > s.n ? "bg-success" : "bg-border"
+                  }`}
               />
             )}
           </div>
@@ -367,11 +364,10 @@ function MetodoOption({
   const active = metodo === value;
   return (
     <label
-      className={`flex items-center gap-3 p-3.5 border rounded-xl cursor-pointer tap-target transition-colors ${
-        active
+      className={`flex items-center gap-3 p-3.5 border rounded-xl cursor-pointer tap-target transition-colors ${active
           ? "border-primary bg-primary/5"
           : "border-border hover:border-muted-foreground"
-      }`}
+        }`}
     >
       <input
         type="radio"

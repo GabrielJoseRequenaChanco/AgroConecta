@@ -33,7 +33,7 @@ export const Route = createFileRoute("/dashboard/comprador")({
 const STEPS: { label: string; status: OrderStatus }[] = [
   { label: "Trato Cerrado", status: "pendiente_flete" },
   { label: "Flete Asignado", status: "flete_asignado" },
-  { label: "Cargando en Chacra", status: "cargando_chacra" },
+  { label: "Cargando en Origen", status: "cargando_origen" },
   { label: "En Carretera", status: "en_transito" },
   { label: "En Destino", status: "por_confirmar" },
   { label: "Entregado Conforme", status: "entregado" },
@@ -67,24 +67,24 @@ function CompradorDashboard() {
     (sumatoria, ordenActual) => sumatoria + ordenActual.totalPagoProducto + ordenActual.totalPagoFlete,
     0
   );
-  
+
   const entregadasCount = ordenes.filter((o) => o.status === "entregado").length;
-  
+
   const enTránsitoCount = ordenes.filter(
     (o) => o.status !== "entregado" && o.status !== "pendiente_flete"
   ).length;
 
   return (
     <div className="max-w-[1000px] mx-auto px-3 sm:px-4 py-6 space-y-6 animate-in fade-in duration-200">
-      
+
       {/* SECCIÓN 1: CABECERA DE PERFIL DEL COMPRADOR / MAYORISTA */}
       <div className="bg-card border border-border rounded-2xl p-5 flex flex-wrap items-center gap-4 shadow-xs relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-        
+
         <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-xl font-bold text-primary shrink-0 border border-primary/10 shadow-inner">
           {usuario.nombre ? usuario.nombre[0] : "C"}
         </div>
-        
+
         <div className="flex-1 min-w-[180px]">
           <h1 className="text-xl font-bold text-foreground tracking-tight">{usuario.nombre}</h1>
           <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
@@ -96,19 +96,19 @@ function CompradorDashboard() {
             </span>
           </div>
         </div>
-        
+
         {/* Marcadores de Métricas de Inversión */}
         <div className="flex flex-wrap gap-3 sm:ml-auto w-full sm:w-auto mt-2 sm:mt-0">
           <div className="text-center px-4 py-2 bg-muted/60 border border-border/60 rounded-xl flex-1 sm:flex-initial">
             <div className="text-lg font-black text-foreground">{ordenes.length}</div>
             <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wide">Órdenes</div>
           </div>
-          
+
           <div className="text-center px-4 py-2 bg-muted/60 border border-border/60 rounded-xl flex-1 sm:flex-initial">
             <div className="text-lg font-black text-primary">{formatSoles(totalGastado)}</div>
             <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wide">Total Invertido</div>
           </div>
-          
+
           <div className="text-center px-4 py-2 bg-muted/60 border border-border/60 rounded-xl flex-1 sm:flex-initial">
             <div className="text-lg font-black text-success">{entregadasCount}</div>
             <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wide">Recibidas</div>
@@ -121,7 +121,7 @@ function CompradorDashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-foreground tracking-tight">Mis Compras y Seguimiento de Carga</h2>
-            <p className="text-xs text-muted-foreground">Monitorea el trayecto de los camiones desde las chacras del Valle del Mantaro hasta tu almacén.</p>
+            <p className="text-xs text-muted-foreground">Monitorea el trayecto de los camiones desde las zonas de producción del Valle del Mantaro hasta tu almacén.</p>
           </div>
           <Link
             to="/productos"
@@ -149,7 +149,7 @@ function CompradorDashboard() {
           <div className="space-y-4">
             {ordenes.map((o) => {
               const idxActual = getStepIndex(o.status);
-              
+
               // Mapeo dinámico y exhaustivo de la línea de tiempo basada en los 6 pasos oficiales
               const stepsFormulados = STEPS.map((s, i) => ({
                 label: s.label,
@@ -172,7 +172,7 @@ function CompradorDashboard() {
                         <span className="font-mono font-bold text-zinc-600 dark:text-zinc-400">CÓDIGO DE ORDEN: {o.id}</span>
                         <span>•</span>
                         <span className="inline-flex items-center gap-1 font-medium">
-                          <Calendar className="w-3.5 h-3.5" /> 
+                          <Calendar className="w-3.5 h-3.5" />
                           {new Date(o.fechaCreacion).toLocaleDateString("es-PE", {
                             day: "numeric",
                             month: "long",
@@ -212,17 +212,17 @@ function CompradorDashboard() {
 
                   {/* SECCIÓN DE CONTACTOS: LECTURA DINÁMICA ABSOLUTA DESDE EL STORE */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    
+
                     {/* Tarjeta del Agricultor Conectada */}
                     <ContactCard
                       icon={<Phone className="w-4 h-4 text-success" />}
-                      label="Productor Agrícola en Chacra"
+                      label="Productor Agrícola en Zona de Origen"
                       nombre={o.nombreAgricultor || "Productor del Mantaro"}
                       value={o.telefonoAgricultor || "Teléfono no disponible"}
                       subtext={`Punto de Acopio: ${o.distritoOrigen}`}
                       bg="bg-success/5 border-success/20 dark:bg-success/10"
                     />
-                    
+
                     {/* Tarjeta del Transportista Conectada */}
                     <ContactCard
                       icon={<Truck className="w-4 h-4 text-earth" />}
@@ -230,7 +230,7 @@ function CompradorDashboard() {
                       nombre={o.nombreTransportista ? o.nombreTransportista : "Bolsa de Fletes Abierta"}
                       value={o.telefonoTransportista ? o.telefonoTransportista : "Esperando enganche..."}
                       subtext={
-                        o.vehiculoPlaca 
+                        o.vehiculoPlaca
                           ? `Camión Placa: ${o.vehiculoPlaca} (${o.vehiculoDescripcion || "Baranda"})`
                           : "El flete está publicado esperando un camión libre"
                       }
@@ -250,7 +250,7 @@ function CompradorDashboard() {
 
                   {/* PANEL DE CONTROL DE ACCIONES CONDICIONALES EXHAUSTIVAS */}
                   <div className="pt-2">
-                    
+
                     {/* Caso A: La carga está lista en destino esperando confirmación del comprador */}
                     {o.status === "por_confirmar" && (
                       <div className="space-y-2">
@@ -272,13 +272,13 @@ function CompradorDashboard() {
                     )}
 
                     {/* Caso B: La carga viene en camino o está en fases previas */}
-                    {(o.status === "pendiente_flete" || o.status === "flete_asignado" || o.status === "cargando_chacra" || o.status === "en_transito") && (
+                    {(o.status === "pendiente_flete" || o.status === "flete_asignado" || o.status === "cargando_origen" || o.status === "en_transito") && (
                       <div className="bg-muted/50 border border-border p-3 rounded-xl text-xs text-muted-foreground flex items-center gap-2">
                         <Info className="w-4 h-4 text-primary shrink-0" />
                         <span>
                           {o.status === "pendiente_flete" && "Tu pago está seguro en la pasarela. La orden está listada en la bolsa de fletes buscando camión."}
-                          {o.status === "flete_asignado" && `El transportista ${o.nombreTransportista} ya tomó el flete e inició el viaje hacia la chacra en ${o.distritoOrigen}.`}
-                          {o.status === "cargando_chacra" && "El camión se encuentra actualmente cargando y estibando los sacos en la parcela del agricultor."}
+                          {o.status === "flete_asignado" && `El transportista ${o.nombreTransportista} ya tomó el flete e inició el viaje hacia el punto de carga en ${o.distritoOrigen}.`}
+                          {o.status === "cargando_origen" && "La unidad de transporte se encuentra en el distrito de origen cargando y estibando los sacos del productor."}
                           {o.status === "en_transito" && "La cosecha ya salió a carretera. Monitorea el timeline para saber cuándo arribe a tu almacén."}
                         </span>
                       </div>

@@ -13,6 +13,11 @@ import appCss from "../styles.css?url";
 import { MLHeader } from "@/components/shared/MLHeader";
 import { MLFooter } from "@/components/shared/MLFooter";
 import logo from "@/assets/logo.png";
+import { Toaster } from "@/components/ui/sonner";
+import { useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
+import { useAppStore } from "@/context/useAppStore";
 
 function NotFoundComponent() {
   return (
@@ -128,6 +133,64 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const minimal = pathname.startsWith("/checkout");
+  const loginUser = useAppStore((s) => s.loginUser);
+  const router = useRouter();
+
+  useEffect(() => {
+    // 1. Escuchar posibles errores en la URL del callback (ej. link expirado)
+    const hashStr = typeof window !== "undefined" ? window.location.hash : "";
+    if (hashStr.includes("error_description")) {
+      const params = new URLSearchParams(hashStr.replace("#", "?"));
+      const errorMsg = params.get("error_description");
+      if (errorMsg) {
+        toast.error("Error de activación", {
+          description: decodeURIComponent(errorMsg).replace(/\+/g, " "),
+          duration: 8000,
+        });
+        if (window.history.replaceState) {
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+      }
+    }
+
+    // 2. Escuchador global de autenticación con onAuthStateChange
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session?.user) {
+        // Sincronizar el perfil del usuario en el store global
+        await loginUser(session.user.id);
+
+        // Detectar si proviene de confirmar su correo electrónico
+        const hash = typeof window !== "undefined" ? window.location.hash : "";
+        const search = typeof window !== "undefined" ? window.location.search : "";
+        const isEmailConfirmation =
+          hash.includes("type=signup") ||
+          hash.includes("type=invite") ||
+          search.includes("code=") ||
+          hash.includes("access_token");
+
+        if (isEmailConfirmation) {
+          // Limpiar parámetros de la URL por estética
+          if (typeof window !== "undefined" && window.history.replaceState) {
+            window.history.replaceState(null, "", window.location.pathname);
+          }
+
+          toast.success("¡Cuenta activada con éxito!", {
+            description: "Te damos la bienvenida a AgroConecta. Tu correo ha sido verificado.",
+            duration: 8000,
+          });
+
+          // Redirección automática al catálogo de productos
+          router.navigate({ to: "/productos" as any });
+        }
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [loginUser, router]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -153,6 +216,7 @@ function RootComponent() {
         </main>
         {!minimal && <MLFooter />}
       </div>
+      <Toaster />
     </QueryClientProvider>
   );
 }

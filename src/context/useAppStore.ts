@@ -8,9 +8,26 @@ import type {
   OrderStatus,
   Producto,
   ProductoStatus,
+  RegistroPayload,
   UsuarioActivo,
   VehiculoConfig,
 } from "@/context/types";
+
+/**
+ * Devuelve una ubicación aproximada basada en la zona horaria y el idioma
+ * del navegador, sin solicitar permisos de geolocalización especiales.
+ * Fallback a "Junín, Perú" si no hay señales disponibles.
+ */
+export function getApproxLocation(): string {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tz === "America/Lima") return "Perú";
+    if (tz.startsWith("America/")) return "América";
+    return tz.replace("_", " ") || "Junín, Perú";
+  } catch {
+    return "Junín, Perú";
+  }
+}
 import { supabase } from "@/lib/supabase";
 
 const anonUser: UsuarioActivo = {
@@ -34,8 +51,10 @@ interface AppState {
   loginUser: (userId: string) => Promise<void>;
   logout: () => void;
   verifyUser: (userId: string) => Promise<void>;
+  approveUser: (userId: string) => Promise<void>;
+  rejectUser: (userId: string) => Promise<void>;
   updateUserProfile: (userId: string, patch: Partial<UsuarioActivo>) => Promise<void>;
-  authSignUp: (email: string, password: string, rol: AppRole, payload?: Partial<UsuarioActivo>) => Promise<UsuarioActivo | null>;
+  authSignUp: (email: string, password: string, rol: AppRole, payload?: Partial<UsuarioActivo> & RegistroPayload) => Promise<{ profile: UsuarioActivo | null; error: string | null }>;
   authSignIn: (email: string, password: string) => Promise<UsuarioActivo | null>;
   authSignOut: () => Promise<void>;
   addProducto: (p: Omit<Producto, "id" | "status" | "agricultorId" | "nombreAgricultor" | "telefonoAgricultor" | "reputacionAgricultor" | "isMidagriVerified">) => Promise<Producto | null>;
@@ -88,6 +107,8 @@ export const useAppStore = create<AppState>()((set, get) => {
         vehiculo: payload.vehiculo,
         ruc: payload.ruc,
         razonSocial: payload.razonSocial,
+        documentoUrl: payload.documentoUrl,
+        verificacionEstado: payload.verificacionEstado || "pendiente",
       };
 
       try {
@@ -103,6 +124,8 @@ export const useAppStore = create<AppState>()((set, get) => {
             vehiculo: newUser.vehiculo ? JSON.stringify(newUser.vehiculo) : null,
             ruc: newUser.ruc || null,
             razon_social: newUser.razonSocial || null,
+            documento_url: newUser.documentoUrl || null,
+            verificacion_estado: newUser.verificacionEstado || "pendiente",
           },
         ]);
         if (error) {
@@ -133,6 +156,8 @@ export const useAppStore = create<AppState>()((set, get) => {
             vehiculo: data.vehiculo || undefined,
             ruc: data.ruc || undefined,
             razonSocial: data.razon_social || undefined,
+            documentoUrl: data.documento_url || undefined,
+            verificacionEstado: data.verificacion_status || data.verificacion_estado || undefined,
           };
           set(() => ({ usuarioActivo: fetched } as any));
           return;
@@ -150,7 +175,7 @@ export const useAppStore = create<AppState>()((set, get) => {
 
     verifyUser: async (userId: string) => {
       try {
-        const { error } = await supabase.from("users").update({ is_midagri_verified: true }).eq("id", userId);
+        const { error } = await supabase.from("users").update({ is_midagri_verified: true, verificacion_estado: "aprobado" }).eq("id", userId);
         if (error) {
           console.error("Error updating user verification:", error);
           return;
@@ -158,7 +183,55 @@ export const useAppStore = create<AppState>()((set, get) => {
       } catch (err) {
         console.error("Supabase verify error:", err);
       }
-      set((s) => ({ users: s.users.map((u) => (u.id === userId ? { ...u, isMidagriVerified: true } : u)) }));
+      set((s) => ({ users: s.users.map((u) => (u.id === userId ? { ...u, isMidagriVerified: true, verificacionEstado: "aprobado" } : u)) }));
+    },
+
+    approveUser: async (userId: string) => {
+      try {
+        const { error } = await supabase
+          .from("users")
+          .update({ is_midagri_verified: true, verificacion_estado: "aprobado" })
+          .eq("id", userId);
+        if (error) {
+          console.error("Error approving user:", error);
+          return;
+        }
+      } catch (err) {
+        console.error("Supabase approve error:", err);
+      }
+      set((s) => ({
+        users: s.users.map((u) =>
+          u.id === userId ? { ...u, isMidagriVerified: true, verificacionEstado: "aprobado" } : u
+        ),
+        usuarioActivo:
+          s.usuarioActivo.id === userId
+            ? { ...s.usuarioActivo, isMidagriVerified: true, verificacionEstado: "aprobado" }
+            : s.usuarioActivo,
+      }));
+    },
+
+    rejectUser: async (userId: string) => {
+      try {
+        const { error } = await supabase
+          .from("users")
+          .update({ is_midagri_verified: false, verificacion_estado: "rechazado" })
+          .eq("id", userId);
+        if (error) {
+          console.error("Error rejecting user:", error);
+          return;
+        }
+      } catch (err) {
+        console.error("Supabase reject error:", err);
+      }
+      set((s) => ({
+        users: s.users.map((u) =>
+          u.id === userId ? { ...u, isMidagriVerified: false, verificacionEstado: "rechazado" } : u
+        ),
+        usuarioActivo:
+          s.usuarioActivo.id === userId
+            ? { ...s.usuarioActivo, isMidagriVerified: false, verificacionEstado: "rechazado" }
+            : s.usuarioActivo,
+      }));
     },
 
     updateUserProfile: async (userId: string, patch: Partial<UsuarioActivo>) => {
@@ -172,6 +245,8 @@ export const useAppStore = create<AppState>()((set, get) => {
           ruc: patch.ruc,
           razon_social: patch.razonSocial,
           email: patch.email,
+          documento_url: patch.documentoUrl,
+          verificacion_estado: patch.verificacionEstado,
         };
         Object.keys(dbPatch).forEach((key) => dbPatch[key] === undefined && delete dbPatch[key]);
 
@@ -189,15 +264,49 @@ export const useAppStore = create<AppState>()((set, get) => {
       }));
     },
 
-    authSignUp: async (email: string, password: string, rol: AppRole, payload?: Partial<UsuarioActivo>) => {
+    authSignUp: async (email: string, password: string, rol: AppRole, payload?: Partial<UsuarioActivo> & RegistroPayload) => {
       try {
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+            data: {
+              role: rol || "comprador",
+              nombre: payload?.nombre || "",
+              ubicacion: payload?.ubicacion || "",
+            },
+          },
+        });
+
         if (error) {
           console.error("Auth signUp error:", error);
-          return null;
+          let friendlyMsg = error.message;
+          if (error.message.includes("User already registered") || error.status === 422) {
+            friendlyMsg = "El correo electrónico ya está registrado.";
+          } else if (error.message.includes("should be at least")) {
+            friendlyMsg = "La contraseña es muy corta. Debe tener al menos 6 caracteres.";
+          }
+          return { profile: null, error: friendlyMsg };
         }
+
         const user = data?.user;
-        if (!user) return null;
+        if (!user) {
+          return { profile: null, error: "No se pudo crear la cuenta de usuario." };
+        }
+
+        let vehiculoObj: VehiculoConfig | undefined = undefined;
+        if (payload?.vehiculo && typeof payload.vehiculo === "object") {
+          vehiculoObj = payload.vehiculo;
+        } else if (payload?.vehiculoTipo) {
+          vehiculoObj = {
+            marca: "Genérico",
+            modelo: payload.vehiculoTipo,
+            tipoCarroceria: payload.vehiculoTipo.includes("Furgón") ? "Furgón" : "Baranda",
+            capacidadToneladas: Number(payload.capacidad) || 0,
+            placa: payload.placa || "REG-123",
+          };
+        }
 
         const profile: UsuarioActivo = {
           id: user.id,
@@ -207,9 +316,11 @@ export const useAppStore = create<AppState>()((set, get) => {
           telefono: payload?.telefono || "",
           ubicacion: payload?.ubicacion || "",
           isMidagriVerified: payload?.isMidagriVerified || false,
-          vehiculo: payload?.vehiculo,
-          ruc: payload?.ruc,
-          razonSocial: payload?.razonSocial,
+          vehiculo: vehiculoObj,
+          ruc: payload?.ruc || payload?.documento || undefined,
+          razonSocial: payload?.razonSocial || payload?.local || undefined,
+          documentoUrl: payload?.documentoUrl || undefined,
+          verificacionEstado: payload?.verificacionEstado || "pendiente",
         };
 
         const emailConfirmed = Boolean((user as any).email_confirmed_at || (user as any).confirmed_at);
@@ -227,20 +338,24 @@ export const useAppStore = create<AppState>()((set, get) => {
               vehiculo: profile.vehiculo ? JSON.stringify(profile.vehiculo) : null,
               ruc: profile.ruc || null,
               razon_social: profile.razonSocial || null,
+              documento_url: profile.documentoUrl || null,
+              verificacion_estado: profile.verificacionEstado || "pendiente",
             },
           ]);
           if (upsertErr) {
             console.error("Error upserting profile:", upsertErr);
+            return { profile: null, error: "Error al registrar el perfil en la base de datos: " + upsertErr.message };
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("Supabase upsert profile error:", err);
+          return { profile: null, error: "Error de conexión al registrar el perfil en la base de datos." };
         }
 
         set((s) => ({ users: [profile, ...s.users], usuarioActivo: emailConfirmed ? profile : s.usuarioActivo }));
-        return profile;
-      } catch (err) {
+        return { profile, error: null };
+      } catch (err: any) {
         console.error("authSignUp error:", err);
-        return null;
+        return { profile: null, error: err?.message || "Ocurrió un error inesperado al registrar la cuenta." };
       }
     },
 
@@ -333,7 +448,7 @@ export const useAppStore = create<AppState>()((set, get) => {
           status: nuevoProducto.status,
           fecha_cosecha: nuevoProducto.fechaCosecha,
           descripcion: nuevoProducto.descripcion,
-        }] );
+        }]);
         if (error) {
           console.error("Error inserting producto:", error);
           return null;
@@ -430,7 +545,7 @@ export const useAppStore = create<AppState>()((set, get) => {
           comprador_id: nuevaOrden.compradorId,
           nombre_comprador: nuevaOrden.nombreComprador,
           telefono_comprador: nuevaOrden.telefonoComprador,
-        }] );
+        }]);
         if (ordenError) throw ordenError;
 
         const { error: fleteError } = await supabase.from("fletes").insert([{
@@ -442,7 +557,7 @@ export const useAppStore = create<AppState>()((set, get) => {
           tarifa_propuesta: nuevoFlete.tarifaPropuesta,
           producto_descripcion: nuevoFlete.productoDescripcion,
           status: nuevoFlete.status,
-        }] );
+        }]);
         if (fleteError) throw fleteError;
 
         const { error: productoStatusError } = await supabase.from("productos").update({ status: "reservado" }).eq("id", o.productoId);
@@ -522,13 +637,13 @@ export const useAppStore = create<AppState>()((set, get) => {
 
     marcarCargandoEnChacra: async (ordenId: string) => {
       try {
-        const { error } = await supabase.from("ordenes").update({ status: "cargando_chacra" }).eq("id", ordenId);
+        const { error } = await supabase.from("ordenes").update({ status: "cargando_origen" }).eq("id", ordenId);
         if (error) console.error("Error updating orden status:", error);
       } catch (err) {
         console.error("Supabase update orden error:", err);
       }
       set((s) => ({
-        ordenes: s.ordenes.map((o) => (o.id === ordenId ? { ...o, status: "cargando_chacra" } : o)),
+        ordenes: s.ordenes.map((o) => (o.id === ordenId ? { ...o, status: "cargando_origen" as OrderStatus } : o)),
       }));
     },
 
@@ -616,6 +731,8 @@ export const useAppStore = create<AppState>()((set, get) => {
           vehiculo: d.vehiculo || undefined,
           ruc: d.ruc || undefined,
           razonSocial: d.razon_social || undefined,
+          documentoUrl: d.documento_url || undefined,
+          verificacionEstado: d.verificacion_estado || undefined,
         }));
         set(() => ({ users: mapped }));
 

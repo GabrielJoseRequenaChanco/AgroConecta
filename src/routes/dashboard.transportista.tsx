@@ -25,7 +25,7 @@ export const Route = createFileRoute("/dashboard/transportista")({
 const STEPS: { label: string; status: OrderStatus }[] = [
   { label: "Trato Cerrado", status: "pendiente_flete" },
   { label: "Flete Asignado", status: "flete_asignado" },
-  { label: "Cargando en Chacra", status: "cargando_chacra" },
+  { label: "Cargando en Origen", status: "cargando_origen" },
   { label: "En Carretera", status: "en_transito" },
   { label: "En Destino", status: "por_confirmar" },
   { label: "Entregado Conforme", status: "entregado" },
@@ -46,7 +46,7 @@ function TransportistaDashboard() {
   }, [usuario, router]);
   const todasLasOrdenes = useAppStore((s) => s.ordenes);
   const todosLosFletes = useAppStore((s) => s.fletes);
-  
+
   // Acciones reales del store
   const aceptarFlete = useAppStore((s) => s.aceptarFlete);
   const marcarCargandoEnChacra = useAppStore((s) => s.marcarCargandoEnChacra);
@@ -79,15 +79,15 @@ function TransportistaDashboard() {
 
   return (
     <div className="max-w-[1000px] mx-auto px-3 sm:px-4 py-6 space-y-6 animate-in fade-in duration-200">
-      
+
       {/* SECCIÓN 1: CABECERA */}
       <div className="bg-card border border-border rounded-2xl p-5 flex flex-wrap items-center gap-4 shadow-xs relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-earth/5 rounded-full blur-3xl pointer-events-none" />
-        
+
         <div className="w-14 h-14 bg-earth/10 rounded-2xl flex items-center justify-center text-xl font-bold text-earth shrink-0 border border-earth/10 shadow-inner">
           <Truck className="w-7 h-7 text-earth" />
         </div>
-        
+
         <div className="flex-1 min-w-[200px]">
           <h1 className="text-xl font-bold text-foreground tracking-tight">{usuario.nombre}</h1>
           <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
@@ -171,7 +171,7 @@ function TransportistaDashboard() {
                     </button>
                   )}
 
-                  {viajeActivo.status === "cargando_chacra" && (
+                  {viajeActivo.status === "cargando_origen" && (
                     <button
                       onClick={() => marcarEnTransito(viajeActivo.id)}
                       className="w-full bg-amber-600 text-white font-bold py-3.5 rounded-xl text-xs uppercase tracking-wider shadow-md hover:bg-amber-700 transition-all cursor-pointer"
@@ -227,12 +227,12 @@ function TransportistaDashboard() {
                   <p className="text-[11px] text-muted-foreground">{formatKg(flete.pesoCarga)}</p>
                 </div>
                 <div className="flex items-center justify-between pt-1 border-t border-border/40 mt-auto">
-                   <span className="text-base font-black text-earth">{formatSoles(flete.tarifaPropuesta)}</span>
-                   <button
+                  <span className="text-base font-black text-earth">{formatSoles(flete.tarifaPropuesta)}</span>
+                  <button
                     onClick={() => {
-                        if(usuario.vehiculo) {
-                            aceptarFlete(flete.id, usuario.id, usuario.nombre, usuario.telefono, usuario.vehiculo);
-                        }
+                      if (usuario.vehiculo) {
+                        aceptarFlete(flete.id, usuario.id, usuario.nombre, usuario.telefono, usuario.vehiculo);
+                      }
                     }}
                     disabled={!!viajeActivo}
                     className="bg-earth text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-earth/90 cursor-pointer"

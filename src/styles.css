@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Spline+Sans:wght@400;500&family=Unbounded:wght@700;900&display=swap');
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
@@ -36,11 +37,15 @@
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-border: var(--sidebar-border);
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-sans: "Spline Sans", system-ui, -apple-system, sans-serif;
+  --font-unbounded: "Unbounded", sans-serif;
+  --font-spline: "Spline Sans", sans-serif;
 }
 
 :root {
-  --radius: 0.375rem;
+  --radius: 0.5rem;
+  --font-titles: "Unbounded", sans-serif;
+  --font-body: "Spline Sans", sans-serif;
   /* AgroConecta brand palette */
   --background: #faf9f8;
   --foreground: #1a1a1a;
@@ -73,16 +78,39 @@
 html, body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Typography elements */
+h1, h2, h3, h4, h5, h6,
+.font-title,
+.precio-destacado,
+.nombre-categoria,
+.titulo-tarjeta,
+.alerta-titulo {
+  font-family: var(--font-titles) !important;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Base body elements default font */
+p, span, li, label, input, textarea, select, td, th {
+  font-family: var(--font-body);
+}
+
+/* Highly readable copy styles */
+p, .leading-relaxed {
+  line-height: 1.6;
 }
 
 /* Mercado Libre-style flat card hover */
 .ml-card-hover {
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  transition: box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .ml-card-hover:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
 }
 
 /* Min tap target 48px */

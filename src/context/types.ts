@@ -6,15 +6,15 @@ export type ProductoStatus = "disponible" | "reservado" | "vendido";
 export type OrderStatus =
   | "pendiente_flete"
   | "flete_asignado"
-  | "cargando_chacra"
+  | "cargando_origen"
   | "en_transito"
   | "por_confirmar"
   | "entregado";
 
 export type FleteStatus = "disponible" | "aceptado" | "en_ruta" | "descargado" | "completado";
 
-export type Distrito = "Aco" | "Concepción" | "Orcotuna" | "Mito" | "Sincos" | "Huancayo" | "Lima";
-export type Rubro = "Tubérculos" | "Cereales" | "Hortalizas" | "Frutas" | "Legumbres";
+export type Distrito = "Aco" | "Concepción" | "Orcotuna" | "Mito" | "Sincos" | "Huancayo" | "Lima" | "Satipo" | "Chanchamayo";
+export type Rubro = "Tubérculos" | "Cereales" | "Hortalizas" | "Frutas" | "Legumbres" | "Agroindustria" | "Granos Andinos" | "Otro";
 
 export interface VehiculoConfig {
   marca: string;
@@ -22,6 +22,29 @@ export interface VehiculoConfig {
   tipoCarroceria: "Baranda" | "Furgón" | "Plataforma" | "Volquete";
   capacidadToneladas: number;
   placa: string;
+}
+
+/**
+ * Payload extra que puede venir del formulario de registro antes de ser
+ * normalizado al perfil definitivo. Campos opcionales usados en authSignUp.
+ */
+export interface RegistroPayload {
+  /** DNI (agricultor/transportista, 8 dígitos) o RUC (comprador, 11 dígitos). */
+  documento?: string;
+  /** Nombre del local comercial o razón social del comprador. */
+  local?: string;
+  /** Tipo de vehículo (string crudo del select antes de parsear). */
+  vehiculoTipo?: string;
+  /** Capacidad de carga en toneladas (string crudo). */
+  capacidad?: string;
+  /** Placa del vehículo (string crudo). */
+  placa?: string;
+  /** Cultivos seleccionados por el agricultor. */
+  cultivos?: string[];
+  /** Rutas que cubre el transportista. */
+  rutas?: string[];
+  /** Hectáreas declaradas por el agricultor. */
+  hectareas?: string;
 }
 
 export interface UsuarioActivo {
@@ -35,6 +58,8 @@ export interface UsuarioActivo {
   vehiculo?: VehiculoConfig;
   ruc?: string;
   razonSocial?: string;
+  documentoUrl?: string;
+  verificacionEstado?: "pendiente" | "aprobado" | "rechazado";
 }
 
 export interface Producto {

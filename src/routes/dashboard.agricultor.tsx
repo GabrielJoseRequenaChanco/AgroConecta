@@ -4,18 +4,18 @@ import { useRouter } from "@tanstack/react-router";
 import { useAppStore } from "@/context/useAppStore";
 import { MLMetricsCard } from "@/components/dashboard/MLMetricsCard";
 import { formatSoles, formatKg } from "@/lib/format";
-import { 
-  Plus, 
-  ShieldCheck, 
+import {
+  Plus,
+  ShieldCheck,
   ShieldAlert,
-  MapPin, 
-  TrendingUp, 
-  Package, 
-  Phone, 
-  Truck, 
-  Calendar, 
-  User, 
-  Layers, 
+  MapPin,
+  TrendingUp,
+  Package,
+  Phone,
+  Truck,
+  Calendar,
+  User,
+  Layers,
   Info,
   DollarSign,
   Tag,
@@ -34,36 +34,36 @@ export const Route = createFileRoute("/dashboard/agricultor")({
  * Mapea directamente cada fase de nuestra máquina de estados central a estilos semánticos y comprensibles.
  */
 const STATUS_BADGE: Record<
-  "disponible" | "pendiente_flete" | "flete_asignado" | "cargando_chacra" | "en_transito" | "por_confirmar" | "entregado", 
+  "disponible" | "pendiente_flete" | "flete_asignado" | "cargando_origen" | "en_transito" | "por_confirmar" | "entregado",
   { txt: string; cls: string }
 > = {
-  disponible: { 
-    txt: "Disponible · Buscando comprador", 
-    cls: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" 
+  disponible: {
+    txt: "Disponible · Buscando comprador",
+    cls: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
   },
-  pendiente_flete: { 
-    txt: "Reservado · Esperando transportista en bolsa", 
-    cls: "bg-blue-500/10 text-blue-600 border border-blue-500/20" 
+  pendiente_flete: {
+    txt: "Reservado · Esperando transportista en bolsa",
+    cls: "bg-blue-500/10 text-blue-600 border border-blue-500/20"
   },
-  flete_asignado: { 
-    txt: "Flete Asignado · Camión en camino a la chacra", 
-    cls: "bg-indigo-500/10 text-indigo-600 border border-indigo-500/20" 
+  flete_asignado: {
+    txt: "Flete Asignado · Unidad de transporte en camino al origen",
+    cls: "bg-indigo-500/10 text-indigo-600 border border-indigo-500/20"
   },
-  cargando_chacra: { 
-    txt: "Logística · Cargando mercadería en chacra", 
-    cls: "bg-amber-500/10 text-amber-600 border border-amber-500/20" 
+  cargando_origen: {
+    txt: "Log\u00edstica · Cargando mercanc\u00eda en zona de origen",
+    cls: "bg-amber-500/10 text-amber-600 border border-amber-500/20"
   },
-  en_transito: { 
-    txt: "En Ruta · Camión transitando carretera", 
-    cls: "bg-orange-500/10 text-orange-600 border border-orange-500/20" 
+  en_transito: {
+    txt: "En Ruta · Cami\u00f3n transitando carretera",
+    cls: "bg-orange-500/10 text-orange-600 border border-orange-500/20"
   },
-  por_confirmar: { 
-    txt: "En Destino · Esperando conformidad de entrega", 
-    cls: "bg-purple-500/10 text-purple-600 border border-purple-500/20" 
+  por_confirmar: {
+    txt: "En Destino · Esperando conformidad de entrega",
+    cls: "bg-purple-500/10 text-purple-600 border border-purple-500/20"
   },
-  entregado: { 
-    txt: "Trato Cerrado · Venta finalizada con éxito", 
-    cls: "bg-zinc-500/10 text-zinc-600 border border-zinc-500/20" 
+  entregado: {
+    txt: "Trato Cerrado · Venta finalizada con \u00e9xito",
+    cls: "bg-zinc-500/10 text-zinc-600 border border-zinc-500/20"
   },
 };
 
@@ -80,10 +80,10 @@ function AgricultorDashboard() {
   const productos = useAppStore((s) => s.productos);
   const ordenes = useAppStore((s) => s.ordenes);
   const addProducto = useAppStore((s) => s.addProducto);
-  
+
   // Estado local para el control de apertura y cierre del panel modal de publicación
   const [modal, setModal] = useState<boolean>(false);
-  
+
   // Estado local opcional para inspeccionar visualmente los detalles de un flete u orden específica en el historial
   const [selectedOrdenId, setSelectedOrdenId] = useState<string | null>(null);
 
@@ -121,29 +121,29 @@ function AgricultorDashboard() {
    */
   const getStatusKey = (p: typeof misProductos[0]) => {
     if (p.status === "vendido") return "entregado";
-    
+
     if (p.status === "reservado") {
       const ordenAsociada = misOrdenes.find((o) => o.productoId === p.id);
       if (ordenAsociada) {
-        return ordenAsociada.status; // Retorna: pendiente_flete | flete_asignado | cargando_chacra | en_transito | por_confirmar
+        return ordenAsociada.status; // Retorna: pendiente_flete | flete_asignado | cargando_origen | en_transito | por_confirmar
       }
       return "pendiente_flete";
     }
-    
+
     return "disponible";
   };
 
   return (
     <div className="max-w-[1200px] mx-auto px-3 sm:px-4 py-6 space-y-6 animate-in fade-in duration-200">
-      
+
       {/* SECCIÓN 1: CABECERA DE PERFIL AGRÓNOMO DEL VALLE DEL MANTARO */}
       <div className="bg-card border border-border rounded-2xl p-5 flex items-center gap-4 flex-wrap shadow-sm relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-success/5 rounded-full blur-3xl pointer-events-none" />
-        
+
         <div className="w-16 h-16 bg-success/10 rounded-2xl flex items-center justify-center text-2xl font-bold text-success shrink-0 border border-success/10 shadow-inner">
           {usuario.nombre ? usuario.nombre[0] : "A"}
         </div>
-        
+
         <div className="flex-1 min-w-[200px]">
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold text-foreground tracking-tight">{usuario.nombre}</h1>
@@ -158,7 +158,7 @@ function AgricultorDashboard() {
             <Phone className="w-3.5 h-3.5 text-muted-foreground" /> {usuario.telefono || "Sin teléfono registrado"}
           </p>
         </div>
-        
+
         <div className="flex flex-wrap gap-2 sm:mt-0 mt-2">
           {usuario.isMidagriVerified ? (
             <span className="inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-bold px-3 py-2 rounded-xl border border-emerald-500/20 shadow-sm">
@@ -253,7 +253,7 @@ function AgricultorDashboard() {
                   {misProductos.map((p) => {
                     const statusKey = getStatusKey(p);
                     const badge = STATUS_BADGE[statusKey] || { txt: "Desconocido", cls: "bg-muted text-muted-foreground" };
-                    
+
                     return (
                       <tr key={p.id} className="hover:bg-muted/20 transition-colors group">
                         <td className="px-4 py-3.5">
@@ -318,11 +318,10 @@ function AgricultorDashboard() {
             {misOrdenes.slice(0, 5).map((o) => {
               const isSelected = selectedOrdenId === o.id;
               return (
-                <div 
+                <div
                   key={o.id}
-                  className={`border rounded-xl p-4 transition-all space-y-3 ${
-                    isSelected ? "border-success bg-success/5 shadow-sm" : "border-border hover:border-zinc-300 bg-card"
-                  }`}
+                  className={`border rounded-xl p-4 transition-all space-y-3 ${isSelected ? "border-success bg-success/5 shadow-sm" : "border-border hover:border-zinc-300 bg-card"
+                    }`}
                 >
                   {/* Fila Principal Resumida */}
                   <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -356,7 +355,7 @@ function AgricultorDashboard() {
                   {/* Bloque de Detalles Expandido (Cero Cableados, Lectura Viva del Store) */}
                   {isSelected && (
                     <div className="mt-3 pt-3 border-t border-dashed border-border grid grid-cols-1 md:grid-cols-3 gap-4 text-xs animate-in slide-in-from-top-1 duration-150">
-                      
+
                       {/* Sub-bloque 1: Comprador */}
                       <div className="space-y-1.5 p-3 bg-muted/40 rounded-xl border border-border/50">
                         <div className="font-bold text-foreground flex items-center gap-1 text-[11px] uppercase tracking-wide text-zinc-500">
@@ -408,7 +407,7 @@ function AgricultorDashboard() {
                             </span>
                           </div>
                         </div>
-                        
+
                         <div className="space-y-0.5 text-[10px] text-muted-foreground border-t border-border/60 pt-1.5 mt-2">
                           {o.fechaAsignacionFlete && (
                             <div>• Asignado: {new Date(o.fechaAsignacionFlete).toLocaleTimeString("es-PE")}</div>
@@ -437,9 +436,9 @@ function AgricultorDashboard() {
       {modal && (
         <PublicarModal
           onClose={() => setModal(false)}
-          onSave={(nuevoProductoFormulado) => { 
-            addProducto(nuevoProductoFormulado); 
-            setModal(false); 
+          onSave={(nuevoProductoFormulado) => {
+            addProducto(nuevoProductoFormulado);
+            setModal(false);
           }}
           agricultor={usuario}
         />
@@ -503,8 +502,8 @@ function PublicarModal({
       distritoOrigen,
       // Asignamos una imagen aleatoria pero realista del sector agropecuario para pruebas visuales en Junín
       imagenUrl:
-        rubro === "Tubérculos" 
-          ? "https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=800&q=80" 
+        rubro === "Tubérculos"
+          ? "https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=800&q=80"
           : "https://images.unsplash.com/photo-1574325131876-a799961e2e5a?w=800&q=80",
       fechaCosecha,
       descripcion: `Cosecha fresca y seleccionada a mano de ${variedad.trim()} cultivada en tierras del distrito de ${distritoOrigen}. Cumple con los estándares sanitarios regionales del Valle del Mantaro. Canal directo de comunicación con ${agricultor.nombre} al teléfono ${agricultor.telefono}.`,
@@ -534,7 +533,7 @@ function PublicarModal({
 
         {/* Cuerpo del Formulario */}
         <div className="p-5 space-y-4 text-sm flex-1">
-          
+
           {errorValidacion && (
             <div className="bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold p-3 rounded-xl flex items-center gap-2">
               <Info className="w-4 h-4 shrink-0" />
@@ -591,7 +590,7 @@ function PublicarModal({
           </div>
 
           <MSelect
-            label="Distrito de Origen (Centro de Acopio en Chacra)"
+            label="Distrito de Origen (Zona de Cosecha)"
             value={distritoOrigen}
             onChange={setDistritoOrigen}
             options={["Aco", "Concepción", "Orcotuna", "Mito", "Sincos"]}
@@ -621,7 +620,7 @@ function PublicarModal({
           >
             Cancelar
           </button>
-          <button 
+          <button
             type="submit"
             className="flex-1 bg-success text-success-foreground font-black py-3 rounded-xl shadow-sm hover:opacity-95 transition-opacity text-sm cursor-pointer"
           >
@@ -670,9 +669,8 @@ function MInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className={`w-full border border-input rounded-xl py-2.5 text-sm font-medium bg-card text-foreground focus:outline-hidden focus:ring-2 focus:ring-success/20 focus:border-success transition-all ${
-            icon ? "pl-9 pr-3" : "px-3"
-          }`}
+          className={`w-full border border-input rounded-xl py-2.5 text-sm font-medium bg-card text-foreground focus:outline-hidden focus:ring-2 focus:ring-success/20 focus:border-success transition-all ${icon ? "pl-9 pr-3" : "px-3"
+            }`}
         />
       </div>
     </div>
