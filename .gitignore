@@ -1,26 +1,55 @@
-# Node modules
+# ==========================================
+# 📦 Node & Dependencies
+# ==========================================
 node_modules/
-
-# Build output
-dist/
-
-# Local environment variables
-.env
-.env.local
-
-# Vite cache
-.vite/
-
-# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# IDE files
+# ==========================================
+# 🚀 Build & Distribution Outputs (Vite / Nitro)
+# ==========================================
+dist/
+.output/
+.vite/
+out/
+
+# ==========================================
+# ⛅️ Cloudflare Wrangler Cache & Configs
+# ==========================================
+.wrangler/
+wrangler.json
+dist/server/wrangler.json
+.output/server/wrangler.json
+.dev.vars
+
+# ==========================================
+# 🔑 Local Environment Variables & Secrets
+# ==========================================
+.env
+.env.local
+.env.production
+.env.development
+.env.*.local
+
+# ==========================================
+# 🛠️ IDE, Editors & System Files
+# ==========================================
 .vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+.DS_Store
+Thumbs.db
 
-# Streamlit secrets (local only)
-.streamlit/secrets.toml
-
-# Streamlit cache
+# ==========================================
+# 🎈 Python / Streamlit (Legacy or Tools)
+# ==========================================
 .streamlit/
+__pycache__/
+*.py[cod]
+*$py.class

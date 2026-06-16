@@ -12,6 +12,37 @@ import type {
   UsuarioActivo,
   VehiculoConfig,
 } from "@/context/types";
+import { supabase } from "@/lib/supabase";
+
+/**
+ * Sube un archivo a un bucket específico en Supabase Storage
+ * Genera un nombre único con UUID/Random para evitar colisiones
+ */
+export async function uploadFileToStorage(bucket: string, file: File): Promise<string | null> {
+  try {
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${crypto.randomUUID()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error("Error al subir archivo a Supabase Storage:", uploadError);
+      return null;
+    }
+
+    const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+    return data.publicUrl || null;
+  } catch (error) {
+    console.error("Excepción en uploadFileToStorage:", error);
+    return null;
+  }
+}
 
 /**
  * Devuelve una ubicación aproximada basada en la zona horaria y el idioma
@@ -28,7 +59,6 @@ export function getApproxLocation(): string {
     return "Junín, Perú";
   }
 }
-import { supabase } from "@/lib/supabase";
 
 const anonUser: UsuarioActivo = {
   rol: "anon",
@@ -58,6 +88,8 @@ interface AppState {
   authSignIn: (email: string, password: string) => Promise<UsuarioActivo | null>;
   authSignOut: () => Promise<void>;
   addProducto: (p: Omit<Producto, "id" | "status" | "agricultorId" | "nombreAgricultor" | "telefonoAgricultor" | "reputacionAgricultor" | "isMidagriVerified">) => Promise<Producto | null>;
+  updateProducto: (productoId: string, patch: Partial<Pick<Producto, "titulo" | "rubro" | "variedad" | "volumenDisponible" | "precioPerKg" | "distritoOrigen" | "fechaCosecha" | "imagenUrl" | "descripcion">>) => Promise<void>;
+  desactivarProducto: (productoId: string) => Promise<void>;
   eliminarProducto: (productoId: string) => Promise<void>;
   createOrden: (
     o: {
@@ -72,6 +104,7 @@ interface AppState {
       agricultorId: string;
       nombreAgricultor: string;
       telefonoAgricultor: string;
+      comprobanteUrl: string;
     },
     fleteInfo: { origen: string; destino: string; tarifa: number; descripcion: string }
   ) => Promise<string | null>;
@@ -80,6 +113,7 @@ interface AppState {
   marcarEnTransito: (ordenId: string) => Promise<void>;
   solicitarConfirmacionEntrega: (ordenId: string) => Promise<void>;
   completarEntrega: (ordenId: string) => Promise<void>;
+  liquidarOrden: (ordenId: string) => Promise<void>;
   resetStore: () => void;
 }
 
@@ -108,7 +142,8 @@ export const useAppStore = create<AppState>()((set, get) => {
         ruc: payload.ruc,
         razonSocial: payload.razonSocial,
         documentoUrl: payload.documentoUrl,
-        verificacionEstado: payload.verificacionEstado || "pendiente",
+        breveteUrl: payload.breveteUrl,
+        verificacionEstado: payload.verificacionEstado || "PENDIENTE_VERIFICACION",
       };
 
       try {
@@ -125,7 +160,8 @@ export const useAppStore = create<AppState>()((set, get) => {
             ruc: newUser.ruc || null,
             razon_social: newUser.razonSocial || null,
             documento_url: newUser.documentoUrl || null,
-            verificacion_estado: newUser.verificacionEstado || "pendiente",
+            brevete_url: newUser.breveteUrl || null,
+            verificacion_estado: newUser.verificacionEstado || "PENDIENTE_VERIFICACION",
           },
         ]);
         if (error) {
@@ -157,7 +193,8 @@ export const useAppStore = create<AppState>()((set, get) => {
             ruc: data.ruc || undefined,
             razonSocial: data.razon_social || undefined,
             documentoUrl: data.documento_url || undefined,
-            verificacionEstado: data.verificacion_status || data.verificacion_estado || undefined,
+            breveteUrl: data.brevete_url || undefined,
+            verificacionEstado: data.verificacion_estado || undefined,
           };
           set(() => ({ usuarioActivo: fetched } as any));
           return;
@@ -246,6 +283,7 @@ export const useAppStore = create<AppState>()((set, get) => {
           razon_social: patch.razonSocial,
           email: patch.email,
           documento_url: patch.documentoUrl,
+          brevete_url: patch.breveteUrl,
           verificacion_estado: patch.verificacionEstado,
         };
         Object.keys(dbPatch).forEach((key) => dbPatch[key] === undefined && delete dbPatch[key]);
@@ -266,11 +304,14 @@ export const useAppStore = create<AppState>()((set, get) => {
 
     authSignUp: async (email: string, password: string, rol: AppRole, payload?: Partial<UsuarioActivo> & RegistroPayload) => {
       try {
+        if (!email.includes("@")) {
+          return { profile: null, error: "El correo electrónico no es válido (debe contener '@')." };
+        }
+
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
             data: {
               role: rol || "comprador",
               nombre: payload?.nombre || "",
@@ -320,10 +361,9 @@ export const useAppStore = create<AppState>()((set, get) => {
           ruc: payload?.ruc || payload?.documento || undefined,
           razonSocial: payload?.razonSocial || payload?.local || undefined,
           documentoUrl: payload?.documentoUrl || undefined,
-          verificacionEstado: payload?.verificacionEstado || "pendiente",
+          breveteUrl: payload?.breveteUrl || undefined,
+          verificacionEstado: payload?.verificacionEstado || "PENDIENTE_VERIFICACION",
         };
-
-        const emailConfirmed = Boolean((user as any).email_confirmed_at || (user as any).confirmed_at);
 
         try {
           const { error: upsertErr } = await supabase.from("users").upsert([
@@ -339,7 +379,8 @@ export const useAppStore = create<AppState>()((set, get) => {
               ruc: profile.ruc || null,
               razon_social: profile.razonSocial || null,
               documento_url: profile.documentoUrl || null,
-              verificacion_estado: profile.verificacionEstado || "pendiente",
+              brevete_url: profile.breveteUrl || null,
+              verificacion_estado: profile.verificacionEstado || "PENDIENTE_VERIFICACION",
             },
           ]);
           if (upsertErr) {
@@ -351,7 +392,8 @@ export const useAppStore = create<AppState>()((set, get) => {
           return { profile: null, error: "Error de conexión al registrar el perfil en la base de datos." };
         }
 
-        set((s) => ({ users: [profile, ...s.users], usuarioActivo: emailConfirmed ? profile : s.usuarioActivo }));
+        // Fricción Cero: Autenticar inmediatamente en el estado del frontend sin requerir verificación por correo
+        set((s) => ({ users: [profile, ...s.users], usuarioActivo: profile }));
         return { profile, error: null };
       } catch (err: any) {
         console.error("authSignUp error:", err);
@@ -383,6 +425,9 @@ export const useAppStore = create<AppState>()((set, get) => {
               vehiculo: profileData.vehiculo || undefined,
               ruc: profileData.ruc || undefined,
               razonSocial: profileData.razon_social || undefined,
+              documentoUrl: profileData.documento_url || undefined,
+              breveteUrl: profileData.brevete_url || undefined,
+              verificacionEstado: profileData.verificacion_estado || undefined,
             };
             set(() => ({ usuarioActivo: profile } as any));
             return profile;
@@ -462,6 +507,65 @@ export const useAppStore = create<AppState>()((set, get) => {
       return nuevoProducto;
     },
 
+    updateProducto: async (productoId: string, patch: Partial<Pick<Producto, "titulo" | "rubro" | "variedad" | "volumenDisponible" | "precioPerKg" | "distritoOrigen" | "fechaCosecha" | "imagenUrl" | "descripcion">>) => {
+      try {
+        // Construir el objeto con nombres de columnas de Supabase (snake_case)
+        const dbPatch: Record<string, unknown> = {};
+        if (patch.titulo !== undefined) dbPatch.titulo = patch.titulo;
+        if (patch.rubro !== undefined) dbPatch.rubro = patch.rubro;
+        if (patch.variedad !== undefined) dbPatch.variedad = patch.variedad;
+        if (patch.volumenDisponible !== undefined) dbPatch.volumen_disponible = patch.volumenDisponible;
+        if (patch.precioPerKg !== undefined) dbPatch.precio_per_kg = patch.precioPerKg;
+        if (patch.distritoOrigen !== undefined) dbPatch.distrito_origen = patch.distritoOrigen;
+        if (patch.fechaCosecha !== undefined) dbPatch.fecha_cosecha = patch.fechaCosecha;
+        if (patch.imagenUrl !== undefined) dbPatch.imagen_url = patch.imagenUrl;
+        if (patch.descripcion !== undefined) dbPatch.descripcion = patch.descripcion;
+
+        const { error } = await supabase
+          .from("productos")
+          .update(dbPatch)
+          .eq("id", productoId);
+
+        if (error) {
+          console.error("Error updating producto:", error);
+          return;
+        }
+      } catch (err) {
+        console.error("Supabase update producto error:", err);
+        return;
+      }
+      // Actualizar en el store local
+      set((s) => ({
+        productos: s.productos.map((p) =>
+          p.id === productoId ? { ...p, ...patch } : p
+        ),
+      }));
+    },
+
+    desactivarProducto: async (productoId: string) => {
+      try {
+        // Cambiar el status a 'vendido' equivale a desactivarlo del catálogo
+        const { error } = await supabase
+          .from("productos")
+          .update({ status: "vendido" })
+          .eq("id", productoId);
+
+        if (error) {
+          console.error("Error desactivando producto:", error);
+          return;
+        }
+      } catch (err) {
+        console.error("Supabase desactivar producto error:", err);
+        return;
+      }
+      // Reflejar en el store local
+      set((s) => ({
+        productos: s.productos.map((p) =>
+          p.id === productoId ? { ...p, status: "vendido" as const } : p
+        ),
+      }));
+    },
+
     eliminarProducto: async (productoId: string) => {
       try {
         const { error } = await supabase.from("productos").delete().eq("id", productoId);
@@ -488,6 +592,7 @@ export const useAppStore = create<AppState>()((set, get) => {
         agricultorId: string;
         nombreAgricultor: string;
         telefonoAgricultor: string;
+        comprobanteUrl: string;
       },
       fleteInfo: { origen: string; destino: string; tarifa: number; descripcion: string }
     ) => {
@@ -495,7 +600,7 @@ export const useAppStore = create<AppState>()((set, get) => {
       const fleteId = uid("f");
       const comprador = get().usuarioActivo;
 
-      const nuevaOrden: Partial<Orden> = {
+      const nuevaOrden: Orden = {
         id: ordenId,
         fechaCreacion: new Date().toISOString(),
         productoId: o.productoId,
@@ -504,7 +609,7 @@ export const useAppStore = create<AppState>()((set, get) => {
         precioUnitario: o.precioUnitario,
         totalPagoProducto: o.totalPagoProducto,
         totalPagoFlete: o.totalPagoFlete,
-        status: "pendiente_flete",
+        status: "PAGO_EN_CUSTODIA",
         distritoOrigen: o.distritoOrigen,
         distritoDestino: o.distritoDestino,
         agricultorId: o.agricultorId,
@@ -513,9 +618,10 @@ export const useAppStore = create<AppState>()((set, get) => {
         compradorId: comprador.id,
         nombreComprador: comprador.nombre,
         telefonoComprador: comprador.telefono,
+        comprobanteUrl: o.comprobanteUrl,
       };
 
-      const nuevoFlete: Partial<Flete> = {
+      const nuevoFlete: Flete = {
         id: fleteId,
         ordenId,
         origen: fleteInfo.origen,
@@ -545,6 +651,7 @@ export const useAppStore = create<AppState>()((set, get) => {
           comprador_id: nuevaOrden.compradorId,
           nombre_comprador: nuevaOrden.nombreComprador,
           telefono_comprador: nuevaOrden.telefonoComprador,
+          comprobante_url: nuevaOrden.comprobanteUrl,
         }]);
         if (ordenError) throw ordenError;
 
@@ -569,8 +676,8 @@ export const useAppStore = create<AppState>()((set, get) => {
       }
 
       set((s) => ({
-        ordenes: [...s.ordenes, nuevaOrden as Orden],
-        fletes: [...s.fletes, nuevoFlete as Flete],
+        ordenes: [...s.ordenes, nuevaOrden],
+        fletes: [...s.fletes, nuevoFlete],
         productos: s.productos.map((p) => (p.id === o.productoId ? { ...p, status: "reservado" } : p)),
       }));
 
@@ -596,7 +703,7 @@ export const useAppStore = create<AppState>()((set, get) => {
       };
 
       const updatesForOrden = {
-        status: "flete_asignado" as OrderStatus,
+        status: "EN_CAMINO" as OrderStatus,
         transportistaId,
         nombreTransportista: nombre,
         telefonoTransportista: telefono,
@@ -664,15 +771,15 @@ export const useAppStore = create<AppState>()((set, get) => {
 
     solicitarConfirmacionEntrega: async (ordenId: string) => {
       try {
-        const { error: ordenErr } = await supabase.from("ordenes").update({ status: "por_confirmar", fecha_solicitud_entrega: new Date().toISOString() }).eq("id", ordenId);
-        if (ordenErr) console.error("Error updating orden status to por_confirmar:", ordenErr);
+        const { error: ordenErr } = await supabase.from("ordenes").update({ status: "ENTREGADO", fecha_solicitud_entrega: new Date().toISOString() }).eq("id", ordenId);
+        if (ordenErr) console.error("Error updating orden status to ENTREGADO:", ordenErr);
         const { error: fleteErr } = await supabase.from("fletes").update({ status: "descargado" }).eq("orden_id", ordenId);
         if (fleteErr) console.error("Error updating flete status to descargado:", fleteErr);
       } catch (err) {
         console.error("Supabase update confirmacion error:", err);
       }
       set((s) => ({
-        ordenes: s.ordenes.map((o) => (o.id === ordenId ? { ...o, status: "por_confirmar", fechaSolicitudEntrega: new Date().toISOString() } : o)),
+        ordenes: s.ordenes.map((o) => (o.id === ordenId ? { ...o, status: "ENTREGADO", fechaSolicitudEntrega: new Date().toISOString() } : o)),
         fletes: s.fletes.map((f) => (f.ordenId === ordenId ? { ...f, status: "descargado" } : f)),
       }));
     },
@@ -681,8 +788,8 @@ export const useAppStore = create<AppState>()((set, get) => {
       const orden = get().ordenes.find((o) => o.id === ordenId);
       if (!orden) return;
       try {
-        const { error: ordenErr } = await supabase.from("ordenes").update({ status: "entregado", fecha_cierre_efectivo: new Date().toISOString() }).eq("id", ordenId);
-        if (ordenErr) console.error("Error updating orden status to entregado:", ordenErr);
+        const { error: ordenErr } = await supabase.from("ordenes").update({ status: "ENTREGADO", fecha_cierre_efectivo: new Date().toISOString() }).eq("id", ordenId);
+        if (ordenErr) console.error("Error updating orden status to ENTREGADO:", ordenErr);
         const { error: fleteErr } = await supabase.from("fletes").update({ status: "completado" }).eq("orden_id", ordenId);
         if (fleteErr) console.error("Error updating flete status to completado:", fleteErr);
         const { error: productoErr } = await supabase.from("productos").update({ status: "vendido" }).eq("id", orden.productoId);
@@ -691,7 +798,39 @@ export const useAppStore = create<AppState>()((set, get) => {
         console.error("Supabase complete delivery error:", err);
       }
       set((s) => ({
-        ordenes: s.ordenes.map((o) => (o.id === ordenId ? { ...o, status: "entregado", fechaCierreEfectivo: new Date().toISOString() } : o)),
+        ordenes: s.ordenes.map((o) => (o.id === ordenId ? { ...o, status: "ENTREGADO", fechaCierreEfectivo: new Date().toISOString() } : o)),
+        fletes: s.fletes.map((f) => (f.ordenId === ordenId ? { ...f, status: "completado" } : f)),
+        productos: s.productos.map((p) => (p.id === orden.productoId ? { ...p, status: "vendido" } : p)),
+      }));
+    },
+
+    liquidarOrden: async (ordenId: string) => {
+      const orden = get().ordenes.find((o) => o.id === ordenId);
+      if (!orden) return;
+      try {
+        const { error: ordenErr } = await supabase
+          .from("ordenes")
+          .update({ status: "COMPLETADO", fecha_cierre_efectivo: new Date().toISOString() })
+          .eq("id", ordenId);
+        if (ordenErr) throw ordenErr;
+
+        const { error: fleteErr } = await supabase
+          .from("fletes")
+          .update({ status: "completado" })
+          .eq("orden_id", ordenId);
+        if (fleteErr) throw fleteErr;
+
+        const { error: prodErr } = await supabase
+          .from("productos")
+          .update({ status: "vendido" })
+          .eq("id", orden.productoId);
+        if (prodErr) throw prodErr;
+      } catch (err) {
+        console.error("Error liquidating order in Supabase:", err);
+      }
+
+      set((s) => ({
+        ordenes: s.ordenes.map((o) => (o.id === ordenId ? { ...o, status: "COMPLETADO", fechaCierreEfectivo: new Date().toISOString() } : o)),
         fletes: s.fletes.map((f) => (f.ordenId === ordenId ? { ...f, status: "completado" } : f)),
         productos: s.productos.map((p) => (p.id === orden.productoId ? { ...p, status: "vendido" } : p)),
       }));
@@ -732,6 +871,7 @@ export const useAppStore = create<AppState>()((set, get) => {
           ruc: d.ruc || undefined,
           razonSocial: d.razon_social || undefined,
           documentoUrl: d.documento_url || undefined,
+          breveteUrl: d.brevete_url || undefined,
           verificacionEstado: d.verificacion_estado || undefined,
         }));
         set(() => ({ users: mapped }));

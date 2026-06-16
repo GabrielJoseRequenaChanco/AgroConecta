@@ -177,7 +177,7 @@ function ProductDetail() {
                 ))}
               </div>
               <span className="text-sm font-semibold">
-                {producto.reputacionAgricultor.toFixed(1)}
+                {producto.reputacionAgricultor?.toFixed(1) ?? "N/A"}
               </span>
               <span className="text-xs text-muted-foreground">(18 opiniones)</span>
             </div>

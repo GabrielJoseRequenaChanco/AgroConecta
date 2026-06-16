@@ -1,10 +1,12 @@
-export const formatSoles = (n: number) =>
-  `S/ ${n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export const formatSoles = (n?: number) =>
+  n != null ? `S/ ${n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "S/ N/A";
 
-export const formatKg = (n: number) =>
-  n >= 1000
-    ? `${(n / 1000).toLocaleString("es-PE", { maximumFractionDigits: 2 })} t`
-    : `${n.toLocaleString("es-PE")} kg`;
+export const formatKg = (n?: number) =>
+  n != null
+    ? n >= 1000
+      ? `${(n / 1000).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} t`
+      : `${n.toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kg`
+    : "N/A";
 
 export const calcularFlete = (destino: string, kg: number) => {
   const base: Record<string, number> = {

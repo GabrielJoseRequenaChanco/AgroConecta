@@ -1,10 +1,8 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { Link, useRouter, createFileRoute } from "@tanstack/react-router";
 import { useState, useRef } from "react";
-import { Sprout, ShoppingBasket, Wrench, Upload, Loader2, CheckCircle2, ChevronRight, Mail } from "lucide-react";
+import { Sprout, ShoppingBasket, Truck, Upload, Loader2, CheckCircle2, ChevronRight, Eye, EyeOff } from "lucide-react";
 import type { UserRole } from "@/context/types";
-import type { RegistroPayload } from "@/context/types";
-import { useAppStore } from "@/context/useAppStore";
-import { supabase } from "@/lib/supabase";
+import { useAppStore, uploadFileToStorage } from "@/context/useAppStore";
 
 export const Route = createFileRoute("/registro")({
   component: Onboarding,
@@ -14,7 +12,7 @@ const ROL_CONFIG = {
   agricultor: {
     icon: <Sprout className="w-6 h-6 text-success" />,
     color: "success",
-    label: "Agricultor",
+    label: "Agricultor / Productor",
     desc: "Vendo mi cosecha directo al comprador",
     bg: "bg-success/10 border-success/30 hover:border-success/60",
     active: "border-success bg-success/5",
@@ -28,14 +26,35 @@ const ROL_CONFIG = {
     active: "border-primary bg-primary/5",
   },
   transportista: {
-    icon: <Wrench className="w-6 h-6 text-earth" />,
+    icon: <Truck className="w-6 h-6 text-amber-700" />,
     color: "earth",
-    label: "Transportista",
+    label: "Transportista de Carga",
     desc: "Realizo fletes en la región Junín",
-    bg: "bg-earth/10 border-earth/30 hover:border-earth/60",
-    active: "border-earth bg-earth/5",
+    bg: "bg-amber-800/10 border-amber-800/30 hover:border-amber-800/60",
+    active: "border-amber-800 bg-amber-800/5",
   },
 } as const;
+
+const PROVINCIAS_DISTRITOS: Record<string, string[]> = {
+  "Huancayo": [
+    "Huancayo", "El Tambo", "Chilca", "Pilcomayo", "San Jerónimo de Tunán", "San Agustín", "Sicaya", "Sapallanga"
+  ],
+  "Concepción": [
+    "Concepción", "Aco", "Mito", "Orcotuna", "Santa Rosa de Ocopa", "Heroínas Toledo"
+  ],
+  "Jauja": [
+    "Jauja", "Apata", "Sincos", "El Mantaro", "Acolla", "Yauyos"
+  ],
+  "Chanchamayo": [
+    "Chanchamayo", "Perené", "Pichanaqui", "San Ramón"
+  ],
+  "Tarma": [
+    "Tarma", "Acobamba", "Huasahuasi", "Palca"
+  ],
+  "Satipo": [
+    "Satipo", "Mazamari", "Pangoa"
+  ],
+};
 
 type DatosForm = Partial<{
   email: string;
@@ -45,7 +64,8 @@ type DatosForm = Partial<{
   telefono: string;
   documento: string;
   documentoUrl: string;
-  verificacionEstado: "pendiente" | "aprobado" | "rechazado";
+  breveteUrl: string;
+  verificacionEstado: "pendiente" | "aprobado" | "rechazado" | "PENDIENTE_VERIFICACION";
   local: string;
   ruc: string;
   vehiculoTipo: string;
@@ -54,74 +74,105 @@ type DatosForm = Partial<{
   cultivos: string[];
   rutas: string[];
   hectareas: string;
+  tipoComprador: "minorista" | "mayorista";
 }>;
 
 function Onboarding() {
   const [rol, setRol] = useState<UserRole | null>(null);
   const [paso, setPaso] = useState(1);
   const [datos, setDatos] = useState<DatosForm>({});
-  const [escaneando, setEscaneando] = useState(false);
-  const [escaneado, setEscaneado] = useState(false);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+const [confirmPassword, setConfirmPassword] = useState<string>("");
+  const [skipEmailValidation, setSkipEmailValidation] = useState<boolean>(false);
+  const [subiendoDni, setSubiendoDni] = useState(false);
+  const [dniCargado, setDniCargado] = useState(false);
+  const [subiendoBrevete, setSubiendoBrevete] = useState(false);
+  const [breveteCargado, setBreveteCargado] = useState(false);
+  
   const [error, setError] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // OTP verification state
-  const [showOtp, setShowOtp] = useState(false);
-  const [otpCode, setOtpCode] = useState("");
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [otpError, setOtpError] = useState<string | null>(null);
-  const [otpSent, setOtpSent] = useState(false);
+  const [provinciaSeleccionada, setProvinciaSeleccionada] = useState("");
+  const [distritoSeleccionado, setDistritoSeleccionado] = useState("");
 
-  const authSignUp = useAppStore((s) => s.authSignUp);
+  const { authSignUp, user } = useAppStore();
   const router = useRouter();
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [nombreArchivo, setNombreArchivo] = useState<string | null>(null);
+  const dniInputRef = useRef<HTMLInputElement>(null);
+  const breveteInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const uploadDni = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setNombreArchivo(file.name);
-    setEscaneando(true);
-    setTimeout(() => {
-      setEscaneando(false);
-      setEscaneado(true);
-      setDatos({
-        ...datos,
-        documentoUrl: file.name,
-        verificacionEstado: "pendiente",
-      });
-    }, 2000);
+    setError(null);
+    setSubiendoDni(true);
+    try {
+      const url = await uploadFileToStorage("dni_documents", file);
+      if (url) {
+        setDatos((prev) => ({ ...prev, documentoUrl: url }));
+        setDniCargado(true);
+      } else {
+        setError("Error al subir el DNI a Supabase Storage.");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Error en la subida del archivo.");
+    } finally {
+      setSubiendoDni(false);
+    }
   };
 
-  /** Valida el paso 1 (datos de acceso) antes de avanzar */
+  const uploadBrevete = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    setSubiendoBrevete(true);
+    try {
+      const url = await uploadFileToStorage("dni_documents", file);
+      if (url) {
+        setDatos((prev) => ({ ...prev, breveteUrl: url }));
+        setBreveteCargado(true);
+      } else {
+        setError("Error al subir la licencia de conducir a Supabase.");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Error en la subida de la licencia.");
+    } finally {
+      setSubiendoBrevete(false);
+    }
+  };
+
   const validarPaso1 = (): string | null => {
     if (!datos.email?.trim()) return "Ingresa tu correo electrónico.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(datos.email.trim())) return "El correo electrónico no tiene un formato válido.";
+    if (!skipEmailValidation && !datos.email.includes("@")) return "El correo electrónico debe contener un '@'.";
     if (!datos.password || datos.password.length < 6) return "La contraseña debe tener al menos 6 caracteres.";
+if (!/^\d+$/.test(datos.password)) return "La contraseña debe ser numérica sin caracteres especiales.";
+if (datos.password !== confirmPassword) return "Las contraseñas no coinciden.";
     if (!datos.nombre?.trim()) return "Ingresa tu nombre completo.";
     if (!datos.telefono?.trim()) return "Ingresa tu número de teléfono o WhatsApp.";
-    if (!datos.ubicacion?.trim()) return "Ingresa tu ubicación (distrito o ciudad).";
+    if (!datos.ubicacion?.trim()) return "Selecciona tu ubicación (provincia y distrito).";
     return null;
   };
 
-  /** Valida el paso 2 (identidad) antes de avanzar */
   const validarPaso2 = (): string | null => {
-    if (!datos.documento?.trim()) return "Debes ingresar tu documento de identidad (DNI o RUC).";
-    if (rol === "comprador" && datos.documento.length !== 11) return "El RUC debe tener exactamente 11 dígitos.";
-    if (rol !== "comprador" && datos.documento.length !== 8) return "El DNI debe tener exactamente 8 dígitos.";
+    if (!datos.documento?.trim()) return "Debes ingresar tu documento de identidad (DNI).";
+    if (datos.documento.length !== 8) return "El DNI debe tener exactamente 8 dígitos.";
+    if (!datos.documentoUrl) return "Debes subir la foto nítida de tu DNI.";
+    if (rol === "transportista" && !datos.breveteUrl) {
+      return "Los transportistas deben subir la foto de su Licencia de Conducir (Brevete).";
+    }
     return null;
   };
 
-  /** Valida el paso 3 (datos del rol) antes de finalizar */
   const validarPaso3 = (): string | null => {
     if (rol === "transportista") {
       if (!datos.vehiculoTipo) return "Selecciona el tipo de vehículo.";
-      if (!datos.capacidad || Number(datos.capacidad) <= 0) return "Ingresa la capacidad de carga del vehículo.";
+      if (!datos.capacidad || Number(datos.capacidad) <= 0) return "Ingresa la capacidad de carga.";
+      if (!datos.placa?.trim()) return "Ingresa la placa de tu vehículo.";
     }
-    if (rol === "comprador") {
-      if (!datos.local?.trim()) return "Ingresa el nombre de tu local comercial.";
+    if (rol === "comprador" && datos.tipoComprador === "mayorista") {
+      if (!datos.local?.trim()) return "Ingresa el nombre del local o Razón Social.";
     }
     return null;
   };
@@ -141,57 +192,42 @@ function Onboarding() {
     if (err3) { setError(err3); return; }
     if (!rol) return;
 
-    const payload: DatosForm & RegistroPayload = { ...datos };
-    const { profile, error: apiError } = await authSignUp(
-      datos.email!,
-      datos.password!,
-      rol,
-      payload as any
-    );
-    if (apiError) { setError(apiError); return; }
-    if (!profile) { setError("No se pudo crear la cuenta. Revisa tus datos e intenta de nuevo."); return; }
+    setLoading(true);
+    
+    // Normalización de datos
+    const payload: DatosForm = {
+      ...datos,
+      verificacionEstado: "PENDIENTE_VERIFICACION"
+    };
 
-    // After account creation, show OTP flow to confirm email
-    setShowOtp(true);
-    setOtpSent(true);
-  };
+    if (rol === "comprador" && datos.tipoComprador === "minorista") {
+      payload.local = undefined;
+      payload.ruc = undefined;
+    } else if (rol === "comprador" && datos.tipoComprador === "mayorista") {
+      payload.ruc = datos.documento;
+      payload.local = datos.local;
+    }
 
-  const verificarOtp = async () => {
-    setOtpError(null);
-    setOtpLoading(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
-        email: datos.email!,
-        token: otpCode.trim(),
-        type: "signup",
-      });
-      if (error) {
-        setOtpError("Código incorrecto o expirado. Revisa tu bandeja de entrada.");
-      } else {
-        setSuccess(true);
-        setStatusMessage(
-          "Tu correo fue confirmado correctamente. Tu cuenta está activa. Ya puedes iniciar sesión en AgroConecta."
-        );
-        setShowOtp(false);
+      const { profile, error: apiError } = await authSignUp(
+        datos.email!,
+        datos.password!,
+        rol,
+        payload as any
+      );
+      if (apiError) {
+        setError(apiError);
+      } else if (profile) {
+        router.navigate({ to: "/" as any });
       }
-    } catch {
-      setOtpError("Ocurrió un error al verificar el código. Intenta de nuevo.");
+    } catch (err) {
+      console.error(err);
+      setError("Error de conexión durante el registro.");
     } finally {
-      setOtpLoading(false);
+      setLoading(false);
     }
   };
 
-  const reenviarOtp = async () => {
-    setOtpError(null);
-    try {
-      await supabase.auth.resend({ type: "signup", email: datos.email! });
-      setOtpError("Se reenvió un nuevo código a tu correo.");
-    } catch {
-      setOtpError("No se pudo reenviar el código. Intenta más tarde.");
-    }
-  };
-
-  // —— Pantalla: Selección de Rol ——
   if (!rol) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-12">
@@ -200,18 +236,23 @@ function Onboarding() {
             Crea tu cuenta en AgroConecta
           </h1>
           <p className="text-muted-foreground text-sm mt-2">
-            Elige el rol con el que vas a operar — puedes cambiarlo después
+            Elige tu rol para comenzar en la plataforma
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-3">
+        <div className="grid grid-cols-1 gap-4">
           {(Object.entries(ROL_CONFIG) as any[]).map(([key, cfg]) => (
             <button
               key={key}
-              onClick={() => setRol(key)}
-              className={`flex items-center gap-4 border-2 rounded-xl p-5 text-left transition-all hover:shadow-md tap-target ${cfg.bg}`}
+              onClick={() => {
+                setRol(key);
+                if (key === "comprador") {
+                  setDatos((prev) => ({ ...prev, tipoComprador: "minorista" }));
+                }
+              }}
+              className={`flex items-center gap-4 border border-border rounded-xl p-5 text-left transition-all hover:shadow-md ${cfg.bg}`}
             >
-              <div className="w-12 h-12 rounded-xl bg-white/60 flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center shrink-0 shadow-sm">
                 {cfg.icon}
               </div>
               <div className="flex-1">
@@ -229,79 +270,8 @@ function Onboarding() {
   const cfg = (ROL_CONFIG as any)[rol];
   const progress = (paso / 3) * 100;
 
-  // —— Pantalla: Ingreso de Código OTP ——
-  if (showOtp) {
-    return (
-      <div className="max-w-md mx-auto px-4 py-12">
-        <div className="bg-card border border-border rounded-2xl p-8 text-center space-y-5">
-          <div className="mx-auto h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
-            <Mail className="w-7 h-7 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-foreground">Confirma tu correo</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Enviamos un código de 6 dígitos a{" "}
-              <strong className="text-foreground">{datos.email}</strong>.
-              Ingrésalo aquí para activar tu cuenta.
-            </p>
-          </div>
-          {otpSent && (
-            <div className="text-xs text-success bg-success/10 border border-success/20 rounded-lg px-3 py-2">
-              ✓ Código enviado. Revisa tu bandeja de entrada (y carpeta de spam).
-            </div>
-          )}
-          <input
-            className="w-full border border-input rounded-xl px-4 py-3 text-center text-2xl font-mono tracking-widest tap-target"
-            placeholder="000000"
-            maxLength={6}
-            value={otpCode}
-            onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-          />
-          {otpError && (
-            <p className={`text-xs font-medium ${otpError.includes("reenvió") ? "text-success" : "text-destructive"}`}>
-              {otpError}
-            </p>
-          )}
-          <button
-            onClick={verificarOtp}
-            disabled={otpLoading || otpCode.length < 6}
-            className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-xl disabled:opacity-50 hover:opacity-90 transition-opacity"
-          >
-            {otpLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Verificar y Activar Cuenta"}
-          </button>
-          <button onClick={reenviarOtp} className="text-xs text-muted-foreground hover:text-primary underline">
-            ¿No llegó? Reenviar código
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // —— Pantalla: Éxito ——
-  if (success) {
-    return (
-      <div className="max-w-md mx-auto px-4 py-12">
-        <div className="bg-card border border-border rounded-2xl p-8 text-center space-y-4">
-          <div className="mx-auto h-14 w-14 rounded-full bg-success/10 text-success flex items-center justify-center">
-            <CheckCircle2 className="w-7 h-7" />
-          </div>
-          <h2 className="text-lg font-bold text-foreground">Cuenta activa</h2>
-          <p className="text-sm text-muted-foreground">{statusMessage}</p>
-          <button
-            onClick={() => router.navigate({ to: "/login" as any })}
-            className="w-full bg-primary text-primary-foreground py-3 rounded-xl text-sm font-semibold hover:opacity-90"
-          >
-            Ir a iniciar sesión
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // —— Pantalla: Formulario multi-paso ——
   return (
     <div className="max-w-lg mx-auto px-4 py-8">
-      {/* Progress header */}
       <div className="mb-6">
         <div className="flex items-center justify-between text-sm mb-2">
           <span className="text-muted-foreground">
@@ -321,13 +291,6 @@ function Onboarding() {
             style={{ width: `${progress}%` }}
           />
         </div>
-        <div className="flex justify-between text-[10px] text-muted-foreground mt-1.5 px-0.5">
-          <span className={paso >= 1 ? "text-foreground font-medium" : ""}>Datos</span>
-          <span className={paso >= 2 ? "text-foreground font-medium" : ""}>Identidad</span>
-          <span className={paso >= 3 ? "text-foreground font-medium" : ""}>
-            {rol === "agricultor" ? "Unidad de Producción" : rol === "comprador" ? "Negocio" : "Vehículo"}
-          </span>
-        </div>
       </div>
 
       <div className="bg-card border border-border rounded-xl p-5 sm:p-6 space-y-4">
@@ -337,22 +300,32 @@ function Onboarding() {
           </div>
         )}
 
-        {/* ── PASO 1: Datos de acceso ── */}
         {paso === 1 && (
           <>
             <h2 className="font-bold text-lg text-foreground">Datos de acceso</h2>
             <Field label="Correo electrónico">
-              <input
-                className="w-full border border-input rounded-lg px-3 py-2.5 tap-target text-sm"
-                placeholder="tucorreo@ejemplo.com"
-                type="email"
-                value={datos.email || ""}
-                onChange={(e) => setDatos({ ...datos, email: e.target.value })}
-              />
+              <div className="relative">
+                <input
+                  className="w-full border border-input rounded-lg px-3 py-2.5 pr-10 text-sm"
+                  placeholder="tucorreo@ejemplo.com"
+                  type="email"
+                  value={datos.email || ""}
+                  onChange={(e) => setDatos({ ...datos, email: e.target.value })}
+                />
+                {user?.rol === "admin" && (
+                  <button
+                    type="button"
+                    onClick={() => setSkipEmailValidation(true)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-primary underline"
+                  >
+                    Omitir validación
+                  </button>
+                )}
+              </div>
             </Field>
             <Field label="Nombre completo">
               <input
-                className="w-full border border-input rounded-lg px-3 py-2.5 tap-target text-sm"
+                className="w-full border border-input rounded-lg px-3 py-2.5 text-sm"
                 placeholder="Nombres y apellidos"
                 value={datos.nombre || ""}
                 onChange={(e) => setDatos({ ...datos, nombre: e.target.value })}
@@ -360,47 +333,111 @@ function Onboarding() {
             </Field>
             <Field label="Teléfono / WhatsApp">
               <input
-                className="w-full border border-input rounded-lg px-3 py-2.5 tap-target text-sm"
+                className="w-full border border-input rounded-lg px-3 py-2.5 text-sm"
                 placeholder="Ej: 964123456"
                 type="tel"
                 value={datos.telefono || ""}
                 onChange={(e) => setDatos({ ...datos, telefono: e.target.value })}
               />
             </Field>
-            <Field label="Ubicación (distrito o ciudad)">
-              <input
-                className="w-full border border-input rounded-lg px-3 py-2.5 tap-target text-sm"
-                placeholder="Ej: Huancayo, Junín"
-                value={datos.ubicacion || ""}
-                onChange={(e) => setDatos({ ...datos, ubicacion: e.target.value })}
-              />
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Provincia (Junín)">
+                <select
+                  className="w-full border border-input rounded-lg px-3 py-2.5 bg-white text-sm"
+                  value={provinciaSeleccionada}
+                  onChange={(e) => {
+                    const prov = e.target.value;
+                    setProvinciaSeleccionada(prov);
+                    setDistritoSeleccionado("");
+                    setDatos((prev) => ({ ...prev, ubicacion: "" }));
+                  }}
+                >
+                  <option value="">Selecciona...</option>
+                  {Object.keys(PROVINCIAS_DISTRITOS).map((prov) => (
+                    <option key={prov} value={prov}>
+                      {prov}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Distrito">
+                <select
+                  disabled={!provinciaSeleccionada}
+                  className="w-full border border-input rounded-lg px-3 py-2.5 bg-white text-sm disabled:opacity-50"
+                  value={distritoSeleccionado}
+                  onChange={(e) => {
+                    const dist = e.target.value;
+                    setDistritoSeleccionado(dist);
+                    if (dist) {
+                      setDatos((prev) => ({ ...prev, ubicacion: `${dist}, ${provinciaSeleccionada} — Junín` }));
+                    } else {
+                      setDatos((prev) => ({ ...prev, ubicacion: "" }));
+                    }
+                  }}
+                >
+                  <option value="">Selecciona...</option>
+                  {provinciaSeleccionada &&
+                    PROVINCIAS_DISTRITOS[provinciaSeleccionada].map((dist) => (
+                      <option key={dist} value={dist}>
+                        {dist}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+            </div>
             <Field label="Contraseña">
-              <input
-                type="password"
-                className="w-full border border-input rounded-lg px-3 py-2.5 tap-target text-sm"
-                placeholder="Mínimo 6 caracteres"
-                value={datos.password || ""}
-                onChange={(e) => setDatos({ ...datos, password: e.target.value })}
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  className="w-full border border-input rounded-lg px-3 py-2.5 pr-10 text-sm"
+                  placeholder="Mínimo 6 caracteres"
+                  value={datos.password || ""}
+                  onChange={(e) => setDatos({ ...datos, password: e.target.value })}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </Field>
+            <Field label="Confirmar Contraseña">
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  className="w-full border border-input rounded-lg px-3 py-2.5 pr-10 text-sm"
+                  placeholder="Repite la contraseña"
+                  value={confirmPassword || ""}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </Field>
             <Nav onNext={irASiguientePaso} />
           </>
         )}
 
-        {/* ── PASO 2: Validación de identidad ── */}
+        {/* PASO 2: Validación KYC de Identidad */}
         {paso === 2 && (
           <>
-            <h2 className="font-bold text-lg text-foreground">Validación de identidad</h2>
+            <h2 className="font-bold text-lg text-foreground">Proceso KYC (Know Your Customer)</h2>
             <p className="text-sm text-muted-foreground -mt-2">
-              Necesitamos verificar tu identidad para activar el{" "}
-              <strong className="text-foreground">Sello de Confianza</strong> en tu perfil.
+              Sube tus documentos obligatorios para seguridad en transacciones de AgroConecta.
             </p>
-            <Field label={rol === "comprador" ? "RUC (11 dígitos)" : "DNI (8 dígitos)"}>
+
+            <Field label="Número de DNI (8 dígitos)">
               <input
-                className="w-full border border-input rounded-lg px-3 py-2.5 tap-target text-sm"
-                placeholder={rol === "comprador" ? "20XXXXXXXXX" : "4XXXXXXX"}
-                maxLength={rol === "comprador" ? 11 : 8}
+                className="w-full border border-input rounded-lg px-3 py-2.5 text-sm"
+                placeholder="4XXXXXXX"
+                maxLength={8}
                 type="text"
                 inputMode="numeric"
                 value={datos.documento || ""}
@@ -408,69 +445,99 @@ function Onboarding() {
               />
             </Field>
 
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept="image/*,application/pdf"
-              className="hidden"
-            />
-
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={escaneando || escaneado}
-              className={`w-full border-2 border-dashed rounded-xl py-8 flex flex-col items-center gap-2.5 transition-colors tap-target ${escaneado
-                  ? "border-success/40 bg-success/5"
-                  : "border-input hover:border-muted-foreground hover:bg-muted/30"
+            {/* Subida del DNI */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-foreground">Foto nítida del DNI (Anverso/Reverso)</label>
+              <input
+                type="file"
+                ref={dniInputRef}
+                onChange={uploadDni}
+                accept="image/*"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => dniInputRef.current?.click()}
+                disabled={subiendoDni}
+                className={`w-full border-2 border-dashed rounded-xl py-6 flex flex-col items-center justify-center gap-2 transition-colors ${
+                  dniCargado ? "border-success/40 bg-success/5" : "border-input hover:border-muted-foreground hover:bg-muted/30"
                 }`}
-            >
-              {escaneando ? (
-                <>
-                  <Loader2 className="w-7 h-7 text-primary animate-spin" />
-                  <span className="text-sm font-medium text-foreground">Subiendo documento...</span>
-                  <span className="text-xs text-muted-foreground">Esto tarda unos segundos</span>
-                </>
-              ) : escaneado ? (
-                <>
-                  <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center">
+              >
+                {subiendoDni ? (
+                  <>
+                    <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                    <span className="text-xs font-semibold text-foreground">Subiendo DNI...</span>
+                  </>
+                ) : dniCargado ? (
+                  <>
                     <CheckCircle2 className="w-6 h-6 text-success" />
-                  </div>
-                  <span className="text-sm font-bold text-success">Documento cargado correctamente</span>
-                  <span className="text-xs text-foreground font-semibold bg-success/10 px-2.5 py-1 rounded border border-success/25 max-w-[280px] truncate">{nombreArchivo}</span>
-                  <span className="text-[10px] text-muted-foreground">Sello de Confianza en estado pendiente de aprobación</span>
-                </>
-              ) : (
-                <>
-                  <Upload className="w-7 h-7 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">
-                    Subir foto de {rol === "comprador" ? "RUC / Ficha RUC" : "DNI o Constancia de Productor"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">JPG, PNG o PDF · máx. 5 MB</span>
-                </>
-              )}
-            </button>
+                    <span className="text-xs font-bold text-success">¡DNI subido correctamente!</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-6 h-6 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Haga clic para cargar foto de DNI</span>
+                  </>
+                )}
+              </button>
+            </div>
 
-            <Nav onBack={() => { setError(null); setPaso(1); }} onNext={irASiguientePaso} />
+            {/* Subida del Brevete (Solo Transportistas) */}
+            {rol === "transportista" && (
+              <div className="space-y-2 pt-2">
+                <label className="block text-sm font-semibold text-foreground">Foto nítida de tu Licencia de Conducir (Brevete)</label>
+                <input
+                  type="file"
+                  ref={breveteInputRef}
+                  onChange={uploadBrevete}
+                  accept="image/*"
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => breveteInputRef.current?.click()}
+                  disabled={subiendoBrevete}
+                  className={`w-full border-2 border-dashed rounded-xl py-6 flex flex-col items-center justify-center gap-2 transition-colors ${
+                    breveteCargado ? "border-success/40 bg-success/5" : "border-input hover:border-muted-foreground hover:bg-muted/30"
+                  }`}
+                >
+                  {subiendoBrevete ? (
+                    <>
+                      <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                      <span className="text-xs font-semibold text-foreground">Subiendo Brevete...</span>
+                    </>
+                  ) : breveteCargado ? (
+                    <>
+                      <CheckCircle2 className="w-6 h-6 text-success" />
+                      <span className="text-xs font-bold text-success">¡Licencia de conducir subida!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-6 h-6 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Haga clic para cargar foto de Brevete</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            <Nav onBack={() => setPaso(1)} onNext={irASiguientePaso} />
           </>
         )}
 
-        {/* ── PASO 3: Datos del rol ── */}
+        {/* PASO 3: Datos de rol */}
         {paso === 3 && (
           <>
             <h2 className="font-bold text-lg text-foreground">
-              {rol === "agricultor"
-                ? "Datos de tu Unidad de Producción"
-                : rol === "comprador"
-                  ? "Datos de tu negocio"
-                  : "Datos de tu vehículo"}
+              {rol === "agricultor" ? "Datos de tu Unidad de Producción" : rol === "comprador" ? "Datos de tu negocio" : "Datos de tu vehículo"}
             </h2>
             {rol === "agricultor" && <CampoAgricultor datos={datos} setDatos={setDatos} />}
             {rol === "comprador" && <CampoComprador datos={datos} setDatos={setDatos} />}
             {rol === "transportista" && <CampoTransportista datos={datos} setDatos={setDatos} />}
             <Nav
-              onBack={() => { setError(null); setPaso(2); }}
+              onBack={() => setPaso(2)}
               onNext={finalizar}
-              nextLabel="Crear cuenta e ingresar →"
+              nextLabel={loading ? "Registrando..." : "Crear cuenta e ingresar →"}
             />
           </>
         )}
@@ -492,7 +559,7 @@ function CampoAgricultor({ datos, setDatos }: { datos: DatosForm; setDatos: (d: 
           step="0.1"
           min="0.1"
           value={datos.hectareas || ""}
-          className="w-full border border-input rounded-lg px-3 py-2.5 tap-target text-sm"
+          className="w-full border border-input rounded-lg px-3 py-2.5 text-sm"
           placeholder="Ej: 1.5"
           onChange={(e) => setDatos({ ...datos, hectareas: e.target.value })}
         />
@@ -501,9 +568,7 @@ function CampoAgricultor({ datos, setDatos }: { datos: DatosForm; setDatos: (d: 
         <div className="bg-muted/50 border border-border rounded-xl p-3.5 text-sm text-foreground">
           <p className="font-semibold text-foreground">Comisión de plataforma aplicada</p>
           <p className="text-muted-foreground text-xs mt-1">
-            Para productores con{" "}
-            {ha >= 5 ? "5 hectáreas o más" : "menos de 5 hectáreas"}: Comisión{" "}
-            <strong className="text-foreground">{comision}</strong> sobre el valor de la venta.
+            Para productores con {ha >= 5 ? "5 hectáreas o más" : "menos de 5 hectáreas"}: Comisión <strong className="text-foreground">{comision}</strong> sobre el valor de la venta.
           </p>
         </div>
       )}
@@ -524,7 +589,7 @@ function CampoAgricultor({ datos, setDatos }: { datos: DatosForm; setDatos: (d: 
                       : currentCultivos.filter((x) => x !== c);
                     setDatos({ ...datos, cultivos: next });
                   }}
-                />{" "}
+                />
                 {c}
               </label>
             );
@@ -538,23 +603,50 @@ function CampoAgricultor({ datos, setDatos }: { datos: DatosForm; setDatos: (d: 
 function CampoComprador({ datos, setDatos }: { datos: DatosForm; setDatos: (d: DatosForm) => void }) {
   return (
     <>
-      <Field label="Nombre del local comercial">
-        <input
-          className="w-full border border-input rounded-lg px-3 py-2.5 tap-target text-sm"
-          placeholder="Minimarket Las Palmas, Restaurante El Huerto..."
-          value={datos.local || ""}
-          onChange={(e) => setDatos({ ...datos, local: e.target.value })}
-        />
-      </Field>
-      <Field label="RUC del negocio (11 dígitos)">
-        <input
-          maxLength={11}
-          className="w-full border border-input rounded-lg px-3 py-2.5 tap-target text-sm"
-          placeholder="20XXXXXXXXX"
-          value={datos.ruc || ""}
-          onChange={(e) => setDatos({ ...datos, ruc: e.target.value })}
-        />
-      </Field>
+      <div className="mb-4">
+        <label className="block text-sm font-semibold text-foreground mb-1.5">Tipo de Comprador</label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setDatos({ ...datos, tipoComprador: "minorista" })}
+            className={`flex items-center justify-center p-3 border rounded-xl cursor-pointer transition-all text-xs font-semibold ${
+              datos.tipoComprador === "minorista" ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:bg-muted/30"
+            }`}
+          >
+            Minorista (Boleta)
+          </button>
+          <button
+            type="button"
+            onClick={() => setDatos({ ...datos, tipoComprador: "mayorista" })}
+            className={`flex items-center justify-center p-3 border rounded-xl cursor-pointer transition-all text-xs font-semibold ${
+              datos.tipoComprador === "mayorista" ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:bg-muted/30"
+            }`}
+          >
+            Mayorista (Factura/RUC)
+          </button>
+        </div>
+      </div>
+      {datos.tipoComprador === "mayorista" && (
+        <>
+          <Field label="Nombre Comercial / Razón Social">
+            <input
+              className="w-full border border-input rounded-lg px-3 py-2.5 text-sm"
+              placeholder="Minimarket Las Palmas, Restaurante El Huerto..."
+              value={datos.local || ""}
+              onChange={(e) => setDatos({ ...datos, local: e.target.value })}
+            />
+          </Field>
+          <Field label="RUC de tu Negocio (11 dígitos)">
+            <input
+              maxLength={11}
+              className="w-full border border-input rounded-lg px-3 py-2.5 text-sm"
+              placeholder="20XXXXXXXXX"
+              value={datos.ruc || ""}
+              onChange={(e) => setDatos({ ...datos, ruc: e.target.value.replace(/\D/g, "") })}
+            />
+          </Field>
+        </>
+      )}
     </>
   );
 }
@@ -564,7 +656,7 @@ function CampoTransportista({ datos, setDatos }: { datos: DatosForm; setDatos: (
     <>
       <Field label="Tipo de vehículo">
         <select
-          className="w-full border border-input rounded-lg px-3 py-2.5 tap-target bg-white text-sm"
+          className="w-full border border-input rounded-lg px-3 py-2.5 bg-white text-sm"
           value={datos.vehiculoTipo || ""}
           onChange={(e) => setDatos({ ...datos, vehiculoTipo: e.target.value })}
         >
@@ -580,7 +672,7 @@ function CampoTransportista({ datos, setDatos }: { datos: DatosForm; setDatos: (
           type="number"
           step="0.5"
           min="0.5"
-          className="w-full border border-input rounded-lg px-3 py-2.5 tap-target text-sm"
+          className="w-full border border-input rounded-lg px-3 py-2.5 text-sm"
           placeholder="Ej: 4"
           value={datos.capacidad || ""}
           onChange={(e) => setDatos({ ...datos, capacidad: e.target.value })}
@@ -588,8 +680,8 @@ function CampoTransportista({ datos, setDatos }: { datos: DatosForm; setDatos: (
       </Field>
       <Field label="Placa del vehículo">
         <input
-          className="w-full border border-input rounded-lg px-3 py-2.5 tap-target text-sm uppercase"
-          placeholder="Ej: ABC-123"
+          className="w-full border border-input rounded-lg px-3 py-2.5 text-sm uppercase"
+          placeholder="Ej: JUN-845"
           value={datos.placa || ""}
           onChange={(e) => setDatos({ ...datos, placa: e.target.value.toUpperCase() })}
         />
@@ -611,7 +703,7 @@ function CampoTransportista({ datos, setDatos }: { datos: DatosForm; setDatos: (
                       : currentRutas.filter((x) => x !== r);
                     setDatos({ ...datos, rutas: next });
                   }}
-                />{" "}
+                />
                 {r}
               </label>
             );
@@ -644,15 +736,17 @@ function Nav({
     <div className="flex gap-2 pt-2">
       {onBack && (
         <button
+          type="button"
           onClick={onBack}
-          className="flex-1 border border-input py-3 rounded-xl tap-target text-sm font-medium hover:bg-muted transition-colors"
+          className="flex-1 border border-input py-3 rounded-xl text-sm font-medium hover:bg-muted transition-colors"
         >
           Atrás
         </button>
       )}
       <button
+        type="button"
         onClick={onNext}
-        className="flex-1 bg-success text-success-foreground font-bold py-3 rounded-xl tap-target hover:opacity-90 transition-opacity text-sm"
+        className="flex-1 bg-success text-success-foreground font-bold py-3 rounded-xl hover:opacity-90 transition-opacity text-sm"
       >
         {nextLabel}
       </button>

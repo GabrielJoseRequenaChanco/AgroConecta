@@ -39,8 +39,9 @@ CREATE TABLE IF NOT EXISTS users (
   ruc                  TEXT,
   razon_social         TEXT,
   documento_url        TEXT,
-  verificacion_estado  TEXT        NOT NULL DEFAULT 'pendiente'
-                                   CHECK (verificacion_estado IN ('pendiente','aprobado','rechazado')),
+  brevete_url          TEXT,
+  verificacion_estado  TEXT        NOT NULL DEFAULT 'PENDIENTE_VERIFICACION'
+                                   CHECK (verificacion_estado IN ('pendiente','aprobado','rechazado','PENDIENTE_VERIFICACION')),
   created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -106,15 +107,21 @@ CREATE TABLE IF NOT EXISTS ordenes (
   precio_unitario         NUMERIC       NOT NULL DEFAULT 0,
   total_pago_producto     NUMERIC       NOT NULL DEFAULT 0,
   total_pago_flete        NUMERIC       NOT NULL DEFAULT 0,
-  status                  TEXT          NOT NULL DEFAULT 'pendiente_flete'
+  status                  TEXT          NOT NULL DEFAULT 'PAGO_EN_CUSTODIA'
                                         CHECK (status IN (
+                                          'PAGO_EN_CUSTODIA',
+                                          'EN_CAMINO',
+                                          'ENTREGADO',
+                                          'COMPLETADO',
                                           'pendiente_flete',
                                           'flete_asignado',
                                           'cargando_origen',
                                           'en_transito',
                                           'por_confirmar',
-                                          'entregado'
+                                          'entregado',
+                                          'completado'
                                         )),
+  comprobante_url         TEXT,
   distrito_origen         TEXT                   DEFAULT '',
   distrito_destino        TEXT                   DEFAULT '',
   agricultor_id           TEXT          REFERENCES users(id) ON DELETE SET NULL,
@@ -531,6 +538,32 @@ VALUES
 -- SELECT rubro, COUNT(*) AS total FROM productos GROUP BY rubro ORDER BY rubro;
 -- SELECT distrito_origen, COUNT(*) AS total FROM productos GROUP BY distrito_origen ORDER BY total DESC;
 
+
+-- =============================================================================
+-- SECCIÓN 6: STORAGE BUCKETS Y POLÍTICAS DE ACCESO
+-- =============================================================================
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES 
+  ('dni_documents', 'dni_documents', true),
+  ('product_images', 'product_images', true),
+  ('payment_vouchers', 'payment_vouchers', true)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "Allow public read on dni_documents" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public insert on dni_documents" ON storage.objects;
+CREATE POLICY "Allow public read on dni_documents" ON storage.objects FOR SELECT USING (bucket_id = 'dni_documents');
+CREATE POLICY "Allow public insert on dni_documents" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'dni_documents');
+
+DROP POLICY IF EXISTS "Allow public read on product_images" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public insert on product_images" ON storage.objects;
+CREATE POLICY "Allow public read on product_images" ON storage.objects FOR SELECT USING (bucket_id = 'product_images');
+CREATE POLICY "Allow public insert on product_images" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'product_images');
+
+DROP POLICY IF EXISTS "Allow public read on payment_vouchers" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public insert on payment_vouchers" ON storage.objects;
+CREATE POLICY "Allow public read on payment_vouchers" ON storage.objects FOR SELECT USING (bucket_id = 'payment_vouchers');
+CREATE POLICY "Allow public insert on payment_vouchers" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'payment_vouchers');
 
 -- =============================================================================
 -- FIN DEL SCRIPT

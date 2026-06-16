@@ -9,7 +9,8 @@ export function MLHeader() {
   const authSignOut = useAppStore((s) => s.authSignOut);
   const router = useRouter();
   const [q, setQ] = useState("");
-  const destino = usuario.ubicacion?.trim() || getApproxLocation();
+  const esAnon = usuario.rol === "anon";
+  const destino = !esAnon && usuario.ubicacion?.trim() ? usuario.ubicacion.split(",")[0] : "Perú";
 
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,11 +63,22 @@ export function MLHeader() {
       {/* Fila 2 (Sub-barra - Fondo Primary) */}
       <div className="bg-primary text-primary-foreground">
         <div className="max-w-[1200px] mx-auto px-3 sm:px-4 py-2 flex items-center gap-3 sm:gap-8 text-xs sm:text-sm overflow-x-auto">
-          <div className="flex items-center gap-1.5 shrink-0">
-            <MapPin className="w-3.5 h-3.5 opacity-85" />
-            <span className="opacity-75">Enviar a</span>
-            <span className="font-semibold">{destino}</span>
-          </div>
+          {destino === "Perú" ? (
+            <Link
+              to="/registro"
+              className="flex items-center gap-1.5 shrink-0 hover:underline cursor-pointer"
+            >
+              <MapPin className="w-3.5 h-3.5 opacity-85 text-emerald-300" />
+              <span className="opacity-75">Enviar a</span>
+              <span className="font-bold underline text-white">Perú</span>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-1.5 shrink-0">
+              <MapPin className="w-3.5 h-3.5 opacity-85 text-emerald-300" />
+              <span className="opacity-75">Enviar a</span>
+              <span className="font-semibold">{destino}</span>
+            </div>
+          )}
 
           <nav className="flex items-center space-x-6 sm:space-x-8 shrink-0">
             <Link

@@ -4,6 +4,7 @@ import type { Producto } from "@/context/types";
 import { formatSoles, formatKg } from "@/lib/format";
 
 export function MLProductCard({ p }: { p: Producto }) {
+  console.log('Estructura del producto:', p);
   return (
     <Link
       to="/producto/$id"
@@ -52,7 +53,7 @@ export function MLProductCard({ p }: { p: Producto }) {
           </span>
           <span className="flex items-center gap-0.5 text-[11px] font-semibold">
             <Star className="w-3 h-3 fill-success text-success" />
-            {p.reputacionAgricultor.toFixed(1)}
+            {p.reputacionAgricultor?.toFixed(1) ?? "N/A"}
           </span>
         </div>
         <div className="text-[11px] text-muted-foreground pt-0.5">

@@ -192,9 +192,18 @@ function RootComponent() {
     };
   }, [loginUser, router]);
 
+  const usuario = useAppStore((s) => s.usuarioActivo);
+  const showKycBanner = usuario && usuario.rol !== "anon" && (usuario.verificacionEstado === "PENDIENTE_VERIFICACION" || usuario.verificacionEstado === "pendiente");
+
   return (
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen flex flex-col bg-background">
+        {showKycBanner && (
+          <div className="bg-yellow-50 border-b border-yellow-200 text-yellow-800 text-xs sm:text-sm py-2 px-4 text-center font-medium flex items-center justify-center gap-2 animate-pulse">
+            <span className="shrink-0">⚠️</span>
+            <span>Tu perfil está en proceso de verificación por nuestro Staff. Puedes explorar la plataforma, pero no podrás realizar transacciones hasta que sea aprobado.</span>
+          </div>
+        )}
         {minimal ? (
           <header className="bg-white border-b border-border py-3 px-4 text-center shadow-sm">
             <Link to="/" className="inline-flex items-center gap-2">

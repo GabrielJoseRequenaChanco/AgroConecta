@@ -146,23 +146,22 @@ function Home() {
   const ordenes = useAppStore((s) => s.ordenes);
 
   // Dynamic real-time stats
-  const agricultoresActivos = users.filter((u) => u.rol === "agricultor").length;
-  const countAgricultores = agricultoresActivos > 0 ? 320 + agricultoresActivos : 320;
+  const countAgricultores = users.filter((u) => u.rol === "agricultor").length;
 
   const dineroMovido = ordenes
     .filter((o) => o.status === "entregado")
     .reduce((acc, o) => acc + (o.totalPagoProducto || 0), 0);
   const strDinero = dineroMovido > 0
-    ? `S/ ${(1.2 + dineroMovido / 1000000).toFixed(2)}M`
-    : "S/ 1.2M";
+    ? `S/ ${dineroMovido?.toLocaleString("es-PE", { minimumFractionDigits: 2 }) ?? "0.00"}`
+    : "S/ 0.00";
 
-  const transportistasCertificados = users.filter((u) => u.rol === "transportista").length;
-  const countTransportistas = transportistasCertificados > 0 ? 85 + transportistasCertificados : 85;
+  const countTransportistas = users.filter((u) => u.rol === "transportista").length;
 
   const allReputaciones = useAppStore((s) => s.productos).map(p => p.reputacionAgricultor);
+  console.log('Reputaciones array:', allReputaciones);
   const avgRep = allReputaciones.length > 0
-    ? (allReputaciones.reduce((a, b) => a + b, 0) / allReputaciones.length).toFixed(1)
-    : "4.9";
+    ? (allReputaciones.reduce((a, b) => (a ?? 0) + (b ?? 0), 0) / allReputaciones.length).toFixed(1)
+    : "5.0";
   const strSatisfaccion = `${avgRep}/5`;
 
   const [bIdx, setBIdx] = useState(0);
@@ -191,7 +190,7 @@ function Home() {
     <div className="min-h-screen bg-background">
       <section className="bg-white">
         <div className="max-w-[1200px] mx-auto px-3 sm:px-4 py-3">
-          <div className="relative h-[240px] sm:h-[320px] md:h-[420px] rounded-3xl overflow-hidden shadow-lg border border-border/35">
+          <div className="relative h-[170px] sm:h-[260px] md:h-[338px] rounded-3xl overflow-hidden shadow-lg border border-border/35">
             {banners.map((banner, i) => (
               <img
                 key={i}
@@ -331,7 +330,7 @@ function Home() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="text-center">
               <div className="flex justify-center mb-2 opacity-80"><Users className="w-5 h-5" /></div>
-              <div className="text-2xl sm:text-3xl font-bold">{countAgricultores}+</div>
+              <div className="text-2xl sm:text-3xl font-bold">{countAgricultores}</div>
               <div className="text-xs sm:text-sm opacity-75 mt-1">Agricultores activos</div>
             </div>
             <div className="text-center">
@@ -346,7 +345,7 @@ function Home() {
             </div>
             <div className="text-center">
               <div className="flex justify-center mb-2 opacity-80"><Truck className="w-5 h-5" /></div>
-              <div className="text-2xl sm:text-3xl font-bold">{countTransportistas}+</div>
+              <div className="text-2xl sm:text-3xl font-bold">{countTransportistas}</div>
               <div className="text-xs sm:text-sm opacity-75 mt-1">Transportistas certificados</div>
             </div>
           </div>
@@ -416,7 +415,7 @@ function Home() {
       <div className="bg-muted/30 border-t border-border/30 py-6 text-center">
         <button
           onClick={async () => {
-            const pass = prompt("Acceso Administrativo\n\nClave de control: agro2026\n\nIngresa la clave:");
+            const pass = prompt("Acceso Administrativo\n\nClave de control: a26\n\nIngresa la clave:");
             if (pass === "agro2026") {
               await useAppStore.getState().loginUser("u-adm-agroconecta");
               toast.success("Iniciado sesión como Administrador de Plataforma");

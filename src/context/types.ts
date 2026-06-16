@@ -4,12 +4,17 @@ export type AppRole = UserRole | "admin" | "demo_user";
 export type ProductoStatus = "disponible" | "reservado" | "vendido";
 
 export type OrderStatus =
+  | "PAGO_EN_CUSTODIA"
+  | "EN_CAMINO"
+  | "ENTREGADO"
+  | "COMPLETADO"
   | "pendiente_flete"
   | "flete_asignado"
   | "cargando_origen"
   | "en_transito"
   | "por_confirmar"
-  | "entregado";
+  | "entregado"
+  | "completado";
 
 export type FleteStatus = "disponible" | "aceptado" | "en_ruta" | "descargado" | "completado";
 
@@ -59,7 +64,9 @@ export interface UsuarioActivo {
   ruc?: string;
   razonSocial?: string;
   documentoUrl?: string;
-  verificacionEstado?: "pendiente" | "aprobado" | "rechazado";
+  breveteUrl?: string;
+  hectareas?: string;
+  verificacionEstado?: "pendiente" | "aprobado" | "rechazado" | "PENDIENTE_VERIFICACION";
 }
 
 export interface Producto {
@@ -99,6 +106,7 @@ export interface Orden {
   compradorId: string;
   nombreComprador: string;
   telefonoComprador: string;
+  comprobanteUrl?: string;
   transportistaId?: string;
   nombreTransportista?: string;
   telefonoTransportista?: string;
